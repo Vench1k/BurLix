@@ -69,6 +69,11 @@ local maxJump = 250
 local humanoid = nil
 local character = nil
 
+-- Visuals State variables
+local highlightEnabled = false
+local bordersEnabled = false
+local namesEnabled = false
+
 -- Create GUI Elements early to guarantee UI is loaded
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "BurLixGUI"
@@ -405,11 +410,11 @@ local function createToggle(tabFrame, name, defaultVal, layoutOrder, onChange)
     return row
 end
 
--- Create Tabs
-local playerTab = createTab("Player", 1, 350)
-local worldTab = createTab("World", 2, 350)
-local authorsTab = createTab("Authors", 3, 500) -- Larger canvas height for changelog details
-local visualsTab = createTab("Visuals", 4, 350)
+-- Create Tabs (Decreased Authors tab canvas height since Reset buttons are removed)
+local playerTab = createTab("Player", 1, 200)
+local worldTab = createTab("World", 2, 200)
+local authorsTab = createTab("Authors", 3, 500)
+local visualsTab = createTab("Visuals", 4, 200)
 
 -- DEFAULT TAB SETTINGS
 showTab("Player")
@@ -459,6 +464,90 @@ player.CharacterAdded:Connect(function(newCharacter)
     end
 end)
 
+-- Helper function to apply visuals to a single player character
+local function updateCharacterVisuals(otherPlayer, char)
+    if otherPlayer == player then return end -- Don't highlight local player
+    if not char then return end
+    
+    -- Outline/Fill highlight handling
+    local highlight = char:FindFirstChild("BurLixHighlight")
+    if highlightEnabled or bordersEnabled then
+        if not highlight then
+            highlight = Instance.new("Highlight")
+            highlight.Name = "BurLixHighlight"
+            highlight.Parent = char
+        end
+        highlight.FillColor = Color3.fromRGB(80, 80, 250)
+        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        highlight.FillTransparency = highlightEnabled and 0.5 or 1
+        highlight.OutlineTransparency = bordersEnabled and 0 or 1
+    else
+        if highlight then
+            highlight:Destroy()
+        end
+    end
+    
+    -- BillboardGui (Names) overhead tag handling
+    local head = char:WaitForChild("Head", 5)
+    if head then
+        local billboard = head:FindFirstChild("BurLixNameTag")
+        if namesEnabled then
+            if not billboard then
+                billboard = Instance.new("BillboardGui")
+                billboard.Name = "BurLixNameTag"
+                billboard.Size = UDim2.new(0, 200, 0, 50)
+                billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+                billboard.AlwaysOnTop = true
+                
+                local nameLabel = Instance.new("TextLabel")
+                nameLabel.Size = UDim2.new(1, 0, 1, 0)
+                nameLabel.BackgroundTransparency = 1
+                nameLabel.Text = otherPlayer.DisplayName or otherPlayer.Name
+                nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+                nameLabel.TextSize = 14
+                nameLabel.Font = Enum.Font.SourceSansBold
+                nameLabel.TextStrokeTransparency = 0
+                nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                nameLabel.Parent = billboard
+                
+                billboard.Parent = head
+            end
+        else
+            if billboard then
+                billboard:Destroy()
+            end
+        end
+    end
+end
+
+-- Refresh visuals for all other players currently in game
+local function refreshAllVisuals()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Character then
+            task.spawn(function()
+                updateCharacterVisuals(p, p.Character)
+            end)
+        end
+    end
+end
+
+-- Hook player and character events to apply visuals dynamically
+local function onPlayerAdded(p)
+    if p == player then return end
+    p.CharacterAdded:Connect(function(char)
+        task.wait(0.5)
+        updateCharacterVisuals(p, char)
+    end)
+    if p.Character then
+        updateCharacterVisuals(p, p.Character)
+    end
+end
+
+Players.PlayerAdded:Connect(onPlayerAdded)
+for _, p in ipairs(Players:GetPlayers()) do
+    onPlayerAdded(p)
+end
+
 -- ==================== PLAYER TAB CONTENTS ====================
 
 -- WalkSpeed Slider
@@ -485,73 +574,12 @@ local jpRow, updateJPSlider = createSlider(playerTab, "Jump Ability", minJump, m
 end)
 updateJPSliderUI = updateJPSlider
 
--- Reset Button
-local resetRow = createRow(playerTab, "ResetRow", 50, 3)
-
-local resetButton = Instance.new("TextButton")
-resetButton.Size = UDim2.new(1, -20, 1, -10)
-resetButton.Position = UDim2.new(0, 10, 0, 5)
-resetButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-resetButton.Text = "Reset Properties to Default"
-resetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-resetButton.TextSize = 14
-resetButton.Font = Enum.Font.SourceSansBold
-resetButton.Parent = resetRow
-
-local resetBtnCorner = Instance.new("UICorner")
-resetBtnCorner.CornerRadius = UDim.new(0, 3)
-resetBtnCorner.Parent = resetButton
-
-resetButton.MouseButton1Click:Connect(function()
-    if humanoid then
-        pcall(function()
-            currentWalkSpeed = 16
-            humanoid.WalkSpeed = 16
-            updateWSSlider((16 - 16) / (200 - 16))
-            
-            if humanoid.UseJumpPower then
-                currentJumpValue = 50
-                humanoid.JumpPower = 50
-                updateJPSlider((50 - 0) / (250 - 0))
-            else
-                currentJumpValue = 7.2
-                humanoid.JumpHeight = 7.2
-                updateJPSlider((7.2 - 0) / (150 - 0))
-            end
-        end)
-    end
-end)
-
 
 -- ==================== WORLD TAB CONTENTS ====================
 
 -- Gravity Slider
 local gravitySliderRow, updateGravitySlider = createSlider(worldTab, "Gravity", 0, 500, Workspace.Gravity, 1, function(val)
     pcall(function() Workspace.Gravity = val end)
-end)
-
--- Reset World button
-local resetWorldRow = createRow(worldTab, "ResetWorldRow", 50, 2)
-
-local resetWorldButton = Instance.new("TextButton")
-resetWorldButton.Size = UDim2.new(1, -20, 1, -10)
-resetWorldButton.Position = UDim2.new(0, 10, 0, 5)
-resetWorldButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-resetWorldButton.Text = "Reset World to Default"
-resetWorldButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-resetWorldButton.TextSize = 14
-resetWorldButton.Font = Enum.Font.SourceSansBold
-resetWorldButton.Parent = resetWorldRow
-
-local resetWorldBtnCorner = Instance.new("UICorner")
-resetWorldBtnCorner.CornerRadius = UDim.new(0, 3)
-resetWorldBtnCorner.Parent = resetWorldButton
-
-resetWorldButton.MouseButton1Click:Connect(function()
-    pcall(function()
-        Workspace.Gravity = 196.2
-        updateGravitySlider((196.2 - 0) / (500 - 0))
-    end)
 end)
 
 
@@ -564,7 +592,7 @@ local creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v1.3.8\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v1.3.9\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.Font = Enum.Font.SourceSansBold
@@ -591,13 +619,14 @@ local changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v1.3.8:\n- Upgraded fonts to SourceSans/SourceSansBold for maximum compatibility across all Roblox clients.\n- Reverted to standard, reliable PlayerGui waiting on startup to prevent parenting issues.\n- Added Visuals tab with Enable Highlighting, Enable Borders, and Show Names toggles (v1.3.5)."
+changelogLabel.Text = "Changelog v1.3.9:\n- Added functional Visuals tab features using Roblox native highlights and overhead Billboards.\n- Removed all Reset buttons from Player and World tabs as requested.\n- Enabled TextWrapped on the changelog card to prevent text from clipping."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.Font = Enum.Font.SourceSans
 changelogLabel.TextXAlignment = Enum.TextXAlignment.Left
 changelogLabel.TextYAlignment = Enum.TextYAlignment.Top
 changelogLabel.LineHeight = 1.3
+changelogLabel.TextWrapped = true
 changelogLabel.Parent = changelogCard
 
 -- User Info Card
@@ -629,17 +658,20 @@ infoLabel.Parent = infoRow
 
 -- Toggle for Highlighting
 createToggle(visualsTab, "Enable Highlighting", false, 1, function(state)
-    -- Logic for player highlighting to be implemented by user
+    highlightEnabled = state
+    refreshAllVisuals()
 end)
 
 -- Toggle for Borders
 createToggle(visualsTab, "Enable Borders", false, 2, function(state)
-    -- Logic for player borders to be implemented by user
+    bordersEnabled = state
+    refreshAllVisuals()
 end)
 
 -- Toggle for Show Names
 createToggle(visualsTab, "Show Names", false, 3, function(state)
-    -- Logic for player names to be implemented by user
+    namesEnabled = state
+    refreshAllVisuals()
 end)
 
 
@@ -727,8 +759,12 @@ end
 
 islandToggle.MouseButton1Click:Connect(toggleUI)
 
--- Completely unload the script / destroy GUI on Close Button click
+-- Completely unload the script / destroy GUI on Close Button click (With active visuals cleanup)
 closeButton.MouseButton1Click:Connect(function()
+    highlightEnabled = false
+    bordersEnabled = false
+    namesEnabled = false
+    pcall(refreshAllVisuals)
     screenGui:Destroy()
 end)
 

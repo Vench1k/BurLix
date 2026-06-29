@@ -63,7 +63,7 @@ titleCorner.Parent = titleBar
 -- Title Text
 local titleText = Instance.new("TextLabel")
 titleText.Name = "TitleText"
-titleText.Size = UDim2.new(1, -30, 1, 0)
+titleText.Size = UDim2.new(1, -60, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
 titleText.BackgroundTransparency = 1
 titleText.Text = "BurLix HUB"
@@ -81,6 +81,30 @@ titleSeparator.Position = UDim2.new(0, 0, 0, 44)
 titleSeparator.BackgroundColor3 = Color3.fromRGB(55, 55, 60)
 titleSeparator.BorderSizePixel = 0
 titleSeparator.Parent = titleBar
+
+-- Close Button (X) to completely close the script
+local closeButton = Instance.new("TextButton")
+closeButton.Name = "CloseButton"
+closeButton.Size = UDim2.new(0, 24, 0, 24)
+closeButton.Position = UDim2.new(1, -34, 0.5, -12)
+closeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+closeButton.Text = "X"
+closeButton.TextColor3 = Color3.fromRGB(240, 240, 245)
+closeButton.TextSize = 12
+closeButton.Font = Enum.Font.GothamBold
+closeButton.Parent = titleBar
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 3)
+closeCorner.Parent = closeButton
+
+-- Close Button Hover/Click Styles
+closeButton.MouseEnter:Connect(function()
+    closeButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+end)
+closeButton.MouseLeave:Connect(function()
+    closeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+end)
 
 -- Navigation Panel (Sidebar)
 local navPanel = Instance.new("Frame")
@@ -390,7 +414,7 @@ local creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v1.3.1\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v1.3.2\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.Font = Enum.Font.GothamSemibold
@@ -411,13 +435,13 @@ thankYouLabel.TextXAlignment = Enum.TextXAlignment.Left
 thankYouLabel.Parent = creatorsCard
 
 -- Changelog Card
-local changelogCard = createRow(authorsTab, "ChangelogCard", 155, 2)
+local changelogCard = createRow(authorsTab, "ChangelogCard", 175, 2)
 
 local changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v1.3.1:\n- Changed menu toggle keybind from P.\n- Added a persistent, draggable stats island at the top.\n- Added live FPS and Ping counters to the island.\n- Added an Open/Close toggle button to the island.\n- Fixed ping calculation scale matching Roblox stats.\n- Added separators to island and main frame title.\n- Fixed layout constraints of thank you footer."
+changelogLabel.Text = "Changelog v1.3.2:\n- Added close button (X) to main menu to destroy GUI.\n- Changed menu toggle keybind from Right Shift to P.\n- Added a persistent, draggable stats island at the top.\n- Added live FPS and Ping counters to the island.\n- Added an Open/Close toggle button to the island.\n- Fixed ping calculation scale matching Roblox stats.\n- Added separators to island and main frame title."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.Font = Enum.Font.Gotham
@@ -526,6 +550,11 @@ local function toggleUI()
 end
 
 islandToggle.MouseButton1Click:Connect(toggleUI)
+
+-- Completely unload the script / destroy GUI on Close Button click
+closeButton.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
 
 -- Toggle Menu Visibility with Key P
 UserInputService.InputBegan:Connect(function(input)

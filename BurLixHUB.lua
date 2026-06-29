@@ -59,6 +59,28 @@ if coreGui then
     end
 end
 
+-- Helper function to convert Color3 to hex string
+local function colorToHex(color)
+    local r = math.round(color.R * 255)
+    local g = math.round(color.G * 255)
+    local b = math.round(color.B * 255)
+    return string.format("#%02X%02X%02X", r, g, b)
+end
+
+-- Helper function to convert hex string to Color3
+local function hexToColor(hex)
+    hex = hex:gsub("#", "")
+    if #hex == 6 then
+        local r = tonumber(hex:sub(1, 2), 16)
+        local g = tonumber(hex:sub(3, 4), 16)
+        local b = tonumber(hex:sub(5, 6), 16)
+        if r and g and b then
+            return Color3.fromRGB(r, g, b)
+        end
+    end
+    return nil
+end
+
 -- Fallback Settings
 local currentWalkSpeed = 16
 local isJumpPower = true
@@ -134,7 +156,7 @@ titleText.Name = "TitleText"
 titleText.Size = UDim2.new(1, -60, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "BurLix HUB v1.4.5"
+titleText.Text = "BurLix HUB v1.4.6"
 titleText.TextColor3 = Color3.fromRGB(240, 240, 245)
 titleText.TextSize = 18
 titleText.Font = Enum.Font.SourceSansBold
@@ -214,10 +236,14 @@ local tabs = {}
 local function showTab(tabName)
     for name, data in pairs(tabs) do
         if name == tabName then
-            data.Button.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+            TweenService:Create(data.Button, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+            }):Play()
             data.Frame.Visible = true
         else
-            data.Button.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+            TweenService:Create(data.Button, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+            }):Play()
             data.Frame.Visible = false
         end
     end
@@ -240,6 +266,22 @@ local function createTab(name, layoutOrder, canvasHeight)
     local btnCorner = Instance.new("UICorner")
     btnCorner.CornerRadius = UDim.new(0, 3)
     btnCorner.Parent = btn
+
+    -- Hover effect for tab button
+    local normalColor = Color3.fromRGB(45, 45, 50)
+    local hoverColor = Color3.fromRGB(52, 52, 58)
+    local activeColor = Color3.fromRGB(60, 60, 70)
+    
+    btn.MouseEnter:Connect(function()
+        if btn.BackgroundColor3 ~= activeColor then
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = hoverColor}):Play()
+        end
+    end)
+    btn.MouseLeave:Connect(function()
+        if btn.BackgroundColor3 ~= activeColor then
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = normalColor}):Play()
+        end
+    end)
 
     -- Content Frame
     local frame = Instance.new("ScrollingFrame")
@@ -442,6 +484,18 @@ local function createToggle(tabFrame, name, defaultVal, layoutOrder, onChange, o
         onChange(enabled)
     end))
     
+    -- Hover effect for the entire row (darken slightly on hover)
+    local normalColor = Color3.fromRGB(45, 45, 50)
+    local hoverColor = Color3.fromRGB(38, 38, 43)
+    
+    table.insert(connections, row.MouseEnter:Connect(function()
+        TweenService:Create(row, TweenInfo.new(0.2), {BackgroundColor3 = hoverColor}):Play()
+    end))
+    
+    table.insert(connections, row.MouseLeave:Connect(function()
+        TweenService:Create(row, TweenInfo.new(0.2), {BackgroundColor3 = normalColor}):Play()
+    end))
+    
     -- Right click logic for the entire row (MouseButton2Click to open settings)
     if onRightClick then
         table.insert(connections, row.MouseButton2Click:Connect(function()
@@ -452,19 +506,45 @@ local function createToggle(tabFrame, name, defaultVal, layoutOrder, onChange, o
     return row
 end
 
--- Helper Function to Create Settings Panel with RGB and custom sliders
+-- Helper function to toggle settings panel with smooth Size animation
+local function toggleSettingsPanel(panel, targetHeight)
+    local isOpening = not panel.Visible or panel.Size.Y.Offset == 0
+    
+    if isOpening then
+        panel.Visible = true
+        panel.Size = UDim2.new(1, 0, 0, 0)
+        local tween = TweenService:Create(panel, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = UDim2.new(1, 0, 0, targetHeight)
+        })
+        tween:Play()
+    else
+        local tween = TweenService:Create(panel, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = UDim2.new(1, 0, 0, 0)
+        })
+        tween:Play()
+        local conn
+        conn = tween.Completed:Connect(function()
+            if panel.Size.Y.Offset == 0 then
+                panel.Visible = false
+            end
+            conn:Disconnect()
+        end)
+    end
+end
+
+-- Helper Function to Create Settings Panel with Presets, HEX Input and custom sliders
 local function createSettingsPanel(tabFrame, layoutOrder, defaultColor, onColorChange, customSliders)
-    local slidersCount = 3 + #customSliders
     local rowHeight = 24
-    local panelHeight = slidersCount * rowHeight + 10
+    local panelHeight = (1 + #customSliders) * rowHeight + 10
     
     local panel = Instance.new("Frame")
     panel.Name = "SettingsPanel"
-    panel.Size = UDim2.new(1, 0, 0, panelHeight)
+    panel.Size = UDim2.new(1, 0, 0, 0) -- Starts at 0 height for animation
     panel.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
     panel.BorderSizePixel = 0
     panel.LayoutOrder = layoutOrder
     panel.Visible = false
+    panel.ClipsDescendants = true -- Crucial for smooth size animation
     panel.Parent = tabFrame
     
     local panelCorner = Instance.new("UICorner")
@@ -483,20 +563,131 @@ local function createSettingsPanel(tabFrame, layoutOrder, defaultColor, onColorC
     listLayout.Padding = UDim.new(0, 2)
     listLayout.Parent = panel
     
-    local rVal = math.round(defaultColor.R * 255)
-    local gVal = math.round(defaultColor.G * 255)
-    local bVal = math.round(defaultColor.B * 255)
+    -- Color Row (Presets + HEX TextBox)
+    local colorRow = Instance.new("Frame")
+    colorRow.Size = UDim2.new(1, 0, 0, rowHeight)
+    colorRow.BackgroundTransparency = 1
+    colorRow.LayoutOrder = 1
+    colorRow.Parent = panel
     
-    local function updateColor()
-        local newColor = Color3.fromRGB(rVal, gVal, bVal)
-        onColorChange(newColor)
+    local colorLabel = Instance.new("TextLabel")
+    colorLabel.Size = UDim2.new(0, 45, 1, 0)
+    colorLabel.BackgroundTransparency = 1
+    colorLabel.Text = "Color:"
+    colorLabel.TextColor3 = Color3.fromRGB(180, 180, 185)
+    colorLabel.TextSize = 11
+    colorLabel.Font = Enum.Font.SourceSansBold
+    colorLabel.TextXAlignment = Enum.TextXAlignment.Left
+    colorLabel.Parent = colorRow
+    
+    -- HEX TextBox
+    local hexInput = Instance.new("TextBox")
+    hexInput.Size = UDim2.new(0, 65, 0, 18)
+    hexInput.Position = UDim2.new(1, -65, 0.5, -9)
+    hexInput.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    hexInput.BorderSizePixel = 0
+    hexInput.Text = colorToHex(defaultColor)
+    hexInput.TextColor3 = Color3.fromRGB(220, 220, 225)
+    hexInput.TextSize = 10
+    hexInput.Font = Enum.Font.SourceSansCode
+    hexInput.ClearTextOnFocus = false
+    hexInput.Parent = colorRow
+    
+    local hexCorner = Instance.new("UICorner")
+    hexCorner.CornerRadius = UDim.new(0, 2)
+    hexCorner.Parent = hexInput
+    
+    local hexStroke = Instance.new("UIStroke")
+    hexStroke.Thickness = 1
+    hexStroke.Color = Color3.fromRGB(50, 50, 55)
+    hexStroke.Parent = hexInput
+    
+    -- Presets Container
+    local presetsContainer = Instance.new("Frame")
+    presetsContainer.Size = UDim2.new(1, -120, 1, 0)
+    presetsContainer.Position = UDim2.new(0, 45, 0, 0)
+    presetsContainer.BackgroundTransparency = 1
+    presetsContainer.Parent = colorRow
+    
+    local presetsLayout = Instance.new("UIListLayout")
+    presetsLayout.FillDirection = Enum.FillDirection.Horizontal
+    presetsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    presetsLayout.Padding = UDim.new(0, 6)
+    presetsLayout.Parent = presetsContainer
+    
+    local presets = {
+        Color3.fromRGB(80, 80, 250),   -- Blue
+        Color3.fromRGB(250, 80, 80),   -- Red
+        Color3.fromRGB(80, 250, 80),   -- Green
+        Color3.fromRGB(250, 250, 80),  -- Yellow
+        Color3.fromRGB(255, 255, 255), -- White
+        Color3.fromRGB(250, 80, 250),  -- Purple
+        Color3.fromRGB(250, 150, 50)   -- Orange
+    }
+    
+    local function selectColor(color, skipHexUpdate)
+        onColorChange(color)
+        if not skipHexUpdate then
+            hexInput.Text = colorToHex(color)
+        end
+        -- Highlight active preset button
+        for _, child in ipairs(presetsContainer:GetChildren()) do
+            if child:IsA("TextButton") then
+                local stroke = child:FindFirstChild("UIStroke")
+                if stroke then
+                    local isMatch = (child.BackgroundColor3.R == color.R and child.BackgroundColor3.G == color.G and child.BackgroundColor3.B == color.B)
+                    stroke.Color = isMatch and Color3.fromRGB(240, 240, 245) or Color3.fromRGB(35, 35, 40)
+                end
+            end
+        end
     end
     
+    for _, color in ipairs(presets) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 14, 0, 14)
+        btn.BackgroundColor3 = color
+        btn.Text = ""
+        btn.Parent = presetsContainer
+        
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(1, 0)
+        btnCorner.Parent = btn
+        
+        local stroke = Instance.new("UIStroke")
+        stroke.Thickness = 1.5
+        stroke.Color = Color3.fromRGB(35, 35, 40)
+        stroke.Parent = btn
+        
+        table.insert(connections, btn.MouseButton1Click:Connect(function()
+            selectColor(color)
+        end))
+    end
+    
+    -- Handle HEX input updates
+    table.insert(connections, hexInput.FocusLost:Connect(function(enterPressed)
+        local inputColor = hexToColor(hexInput.Text)
+        if inputColor then
+            selectColor(inputColor, true)
+            hexStroke.Color = Color3.fromRGB(50, 180, 50) -- Green feedback for success
+            task.delay(0.5, function()
+                hexStroke.Color = Color3.fromRGB(50, 50, 55)
+            end)
+        else
+            -- Revert to current color on invalid input
+            hexInput.Text = hexInput.Text -- triggers redraw of text
+            hexStroke.Color = Color3.fromRGB(180, 50, 50) -- Red feedback for error
+            task.delay(0.5, function()
+                hexStroke.Color = Color3.fromRGB(50, 50, 55)
+            end)
+        end
+    end))
+    
     -- Helper to build a compact slider inside the panel
-    local function buildCompactSlider(sliderName, minVal, maxVal, defaultVal, fillIndex, onChange)
+    local function buildCompactSlider(sliderName, minVal, maxVal, defaultVal, onChange, layoutOrder)
         local sliderRow = Instance.new("Frame")
         sliderRow.Size = UDim2.new(1, 0, 0, rowHeight)
         sliderRow.BackgroundTransparency = 1
+        sliderRow.LayoutOrder = layoutOrder
         sliderRow.Parent = panel
         
         local label = Instance.new("TextLabel")
@@ -520,18 +711,9 @@ local function createSettingsPanel(tabFrame, layoutOrder, defaultColor, onColorC
         sliderBarCorner.CornerRadius = UDim.new(0, 2)
         sliderBarCorner.Parent = sliderBar
         
-        local fillColor = Color3.fromRGB(80, 80, 250)
-        if fillIndex == 1 then
-            fillColor = Color3.fromRGB(220, 80, 80) -- Red
-        elseif fillIndex == 2 then
-            fillColor = Color3.fromRGB(80, 220, 80) -- Green
-        elseif fillIndex == 3 then
-            fillColor = Color3.fromRGB(80, 80, 220) -- Blue
-        end
-        
         local sliderFill = Instance.new("Frame")
         sliderFill.Size = UDim2.new(0, 0, 1, 0)
-        sliderFill.BackgroundColor3 = fillColor
+        sliderFill.BackgroundColor3 = Color3.fromRGB(80, 80, 250)
         sliderFill.BorderSizePixel = 0
         sliderFill.Parent = sliderBar
         
@@ -602,28 +784,15 @@ local function createSettingsPanel(tabFrame, layoutOrder, defaultColor, onColorC
         end))
     end
     
-    -- Add R, G, B sliders
-    buildCompactSlider("Red", 0, 255, rVal, 1, function(val)
-        rVal = val
-        updateColor()
-    end)
-    
-    buildCompactSlider("Green", 0, 255, gVal, 2, function(val)
-        gVal = val
-        updateColor()
-    end)
-    
-    buildCompactSlider("Blue", 0, 255, bVal, 3, function(val)
-        bVal = val
-        updateColor()
-    end)
-    
     -- Add custom sliders
-    for _, sliderConf in ipairs(customSliders) do
-        buildCompactSlider(sliderConf.name, sliderConf.min, sliderConf.max, sliderConf.default, 4, sliderConf.onChange)
+    for idx, sliderConf in ipairs(customSliders) do
+        buildCompactSlider(sliderConf.name, sliderConf.min, sliderConf.max, sliderConf.default, sliderConf.onChange, idx + 1)
     end
     
-    return panel
+    -- Initial select to match color and outline stroke active state
+    selectColor(defaultColor)
+    
+    return panel, panelHeight
 end
 
 -- Create Tabs (Decreased Authors tab canvas height since Reset buttons are removed)
@@ -882,7 +1051,7 @@ local creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v1.4.5\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v1.4.6\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.Font = Enum.Font.SourceSansBold
@@ -911,7 +1080,7 @@ local changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v1.4.5:\n- Added detailed RGB color sliders (Red/Green/Blue) for all Visuals functions.\n- Added highly precise decimal sliders for transparency, outline transparency, font size, and stroke thickness.\n- Increased canvas scrolling size to prevent UI overlaps."
+changelogLabel.Text = "Changelog v1.4.6:\n- Replaced RGB sliders with convenient presets and a custom HEX color input text box.\n- Added smooth hover animations for function rows and tab buttons (slight darkening/highlighting).\n- Implemented smooth accordion-like animations for opening/closing function settings."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.Font = Enum.Font.SourceSans
@@ -949,17 +1118,17 @@ infoLabel.Parent = infoRow
 
 -- ==================== VISUALS TAB CONTENTS ====================
 
-local highlightSettingsPanel
+local highlightSettingsPanel, highlightSettingsHeight
 local highlightRow = createToggle(visualsTab, "Enable Highlighting", false, 1, function(state)
     highlightEnabled = state
     refreshAllVisuals()
 end, function()
-    if highlightSettingsPanel then
-        highlightSettingsPanel.Visible = not highlightSettingsPanel.Visible
+    if highlightSettingsPanel and highlightSettingsHeight then
+        toggleSettingsPanel(highlightSettingsPanel, highlightSettingsHeight)
     end
 end)
 
-highlightSettingsPanel = createSettingsPanel(visualsTab, 2, highlightColor, function(color)
+highlightSettingsPanel, highlightSettingsHeight = createSettingsPanel(visualsTab, 2, highlightColor, function(color)
     highlightColor = color
     refreshAllVisuals()
 end, {
@@ -985,17 +1154,17 @@ end, {
     }
 })
 
-local borderSettingsPanel
+local borderSettingsPanel, borderSettingsHeight
 local borderRow = createToggle(visualsTab, "Enable Borders", false, 3, function(state)
     bordersEnabled = state
     refreshAllVisuals()
 end, function()
-    if borderSettingsPanel then
-        borderSettingsPanel.Visible = not borderSettingsPanel.Visible
+    if borderSettingsPanel and borderSettingsHeight then
+        toggleSettingsPanel(borderSettingsPanel, borderSettingsHeight)
     end
 end)
 
-borderSettingsPanel = createSettingsPanel(visualsTab, 4, borderColor, function(color)
+borderSettingsPanel, borderSettingsHeight = createSettingsPanel(visualsTab, 4, borderColor, function(color)
     borderColor = color
     refreshAllVisuals()
 end, {
@@ -1011,17 +1180,17 @@ end, {
     }
 })
 
-local nameSettingsPanel
+local nameSettingsPanel, nameSettingsHeight
 local nameRow = createToggle(visualsTab, "Show Names", false, 5, function(state)
     namesEnabled = state
     refreshAllVisuals()
 end, function()
-    if nameSettingsPanel then
-        nameSettingsPanel.Visible = not nameSettingsPanel.Visible
+    if nameSettingsPanel and nameSettingsHeight then
+        toggleSettingsPanel(nameSettingsPanel, nameSettingsHeight)
     end
 end)
 
-nameSettingsPanel = createSettingsPanel(visualsTab, 6, nameColor, function(color)
+nameSettingsPanel, nameSettingsHeight = createSettingsPanel(visualsTab, 6, nameColor, function(color)
     nameColor = color
     refreshAllVisuals()
 end, {
@@ -1047,17 +1216,17 @@ end, {
     }
 })
 
-local boxSettingsPanel
+local boxSettingsPanel, boxSettingsHeight
 local boxRow = createToggle(visualsTab, "Show Boxes", false, 7, function(state)
     boxesEnabled = state
     refreshAllVisuals()
 end, function()
-    if boxSettingsPanel then
-        boxSettingsPanel.Visible = not boxSettingsPanel.Visible
+    if boxSettingsPanel and boxSettingsHeight then
+        toggleSettingsPanel(boxSettingsPanel, boxSettingsHeight)
     end
 end)
 
-boxSettingsPanel = createSettingsPanel(visualsTab, 8, boxColor, function(color)
+boxSettingsPanel, boxSettingsHeight = createSettingsPanel(visualsTab, 8, boxColor, function(color)
     boxColor = color
     refreshAllVisuals()
 end, {

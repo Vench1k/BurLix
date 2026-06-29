@@ -12,25 +12,41 @@ local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 
--- Re-hook humanoid on character respawn
+-- Anti-double-run check (Destroy old GUI if it exists)
+local successParent, playerGui = pcall(function() return player:WaitForChild("PlayerGui") end)
+local targetParent = (successParent and playerGui) or game:GetService("CoreGui")
+local oldGui = targetParent:FindFirstChild("BurLixGUI")
+if oldGui then
+    oldGui:Destroy()
+end
+
+-- Initialize current settings
+local currentWalkSpeed = humanoid.WalkSpeed
+local isJumpPower = humanoid.UseJumpPower
+local currentJumpValue = isJumpPower and humanoid.JumpPower or humanoid.JumpHeight
+
+-- Re-hook humanoid and re-apply settings on character respawn
 player.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
     humanoid = newCharacter:WaitForChild("Humanoid")
+    
+    -- Wait briefly for humanoid to load fully before applying settings
+    task.wait(0.5)
+    if humanoid then
+        humanoid.WalkSpeed = currentWalkSpeed
+        if humanoid.UseJumpPower then
+            humanoid.JumpPower = currentJumpValue
+        else
+            humanoid.JumpHeight = currentJumpValue
+        end
+    end
 end)
 
 -- Create GUI Elements
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "BurLixGUI"
 screenGui.ResetOnSpawn = false
-
--- Use CoreGui if running in a plugin context, otherwise ScreenGui in PlayerGui
-local success, playerGui = pcall(function() return player:WaitForChild("PlayerGui") end)
-if success and playerGui then
-    screenGui.Parent = playerGui
-else
-    -- Fallback to standard parent if PlayerGui is not accessible
-    screenGui.Parent = game:GetService("CoreGui")
-end
+screenGui.Parent = targetParent
 
 -- Main Frame (Wider to accommodate left tab sidebar)
 local mainFrame = Instance.new("Frame")
@@ -320,19 +336,16 @@ showTab("Player")
 -- ==================== PLAYER TAB CONTENTS ====================
 
 -- WalkSpeed Slider
-local wsRow, updateWSSlider = createSlider(playerTab, "Walk Speed", 16, 200, humanoid.WalkSpeed, 1, function(val)
+local wsRow, updateWSSlider = createSlider(playerTab, "Walk Speed", 16, 200, currentWalkSpeed, 1, function(val)
+    currentWalkSpeed = val
     if humanoid then
         humanoid.WalkSpeed = val
     end
 end)
 
 -- JumpPower Slider
-local isJumpPower = humanoid.UseJumpPower
-local minJump = isJumpPower and 0 or 0
-local maxJump = isJumpPower and 250 or 150
-local defaultJump = isJumpPower and humanoid.JumpPower or humanoid.JumpHeight
-
-local jpRow, updateJPSlider = createSlider(playerTab, "Jump Ability", minJump, maxJump, defaultJump, 2, function(val)
+local jpRow, updateJPSlider = createSlider(playerTab, "Jump Ability", minJump, maxJump, currentJumpValue, 2, function(val)
+    currentJumpValue = val
     if humanoid then
         if humanoid.UseJumpPower then
             humanoid.JumpPower = val
@@ -361,13 +374,16 @@ resetBtnCorner.Parent = resetButton
 
 resetButton.MouseButton1Click:Connect(function()
     if humanoid then
+        currentWalkSpeed = 16
         humanoid.WalkSpeed = 16
         updateWSSlider((16 - 16) / (200 - 16))
         
         if humanoid.UseJumpPower then
+            currentJumpValue = 50
             humanoid.JumpPower = 50
             updateJPSlider((50 - 0) / (250 - 0))
         else
+            currentJumpValue = 7.2
             humanoid.JumpHeight = 7.2
             updateJPSlider((7.2 - 0) / (150 - 0))
         end
@@ -414,7 +430,7 @@ local creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v1.3.2\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v1.3.3\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.Font = Enum.Font.GothamSemibold
@@ -441,7 +457,7 @@ local changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v1.3.2:\n- Added close button (X) to main menu to destroy GUI.\n- Changed menu toggle keybind from Right Shift to P.\n- Added a persistent, draggable stats island at the top.\n- Added live FPS and Ping counters to the island.\n- Added an Open/Close toggle button to the island.\n- Fixed ping calculation scale matching Roblox stats.\n- Added separators to island and main frame title."
+changelogLabel.Text = "Changelog v1.3.3:\n- Added anti-double-run check to destroy old UI instances.\n- Fixed respawn settings re-application to new humanoid.\n- Replaced tick() with os.clock() in FPS calculation loop.\n- Added close button (X) to main menu title bar (v1.3.2).\n- Changed menu toggle keybind to P."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.Font = Enum.Font.Gotham
@@ -634,12 +650,12 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- FPS and Ping Tracking Logic
-local lastIteration = tick()
+-- FPS and Ping Tracking Logic (Using high performance os.clock() instead of tick())
+local lastIteration = os.clock()
 local frameCount = 0
 RunService.RenderStepped:Connect(function()
     frameCount = frameCount + 1
-    local currentTime = tick()
+    local currentTime = os.clock()
     if currentTime - lastIteration >= 1 then
         local fps = math.round(frameCount / (currentTime - lastIteration))
         islandFPS.Text = "FPS: " .. tostring(fps)

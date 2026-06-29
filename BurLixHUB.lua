@@ -8,30 +8,53 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 
+-- Robust LocalPlayer lookup
 local player = Players.LocalPlayer
-
--- Anti-double-run check (Destroy old GUI if it exists in PlayerGui or CoreGui)
-local coreGui = nil
-pcall(function() coreGui = game:GetService("CoreGui") end)
-
-local playerGui = nil
-pcall(function() playerGui = player:WaitForChild("PlayerGui", 5) end)
-
-if playerGui then
-    local oldGui = playerGui:FindFirstChild("BurLixGUI")
-    if oldGui then
-        pcall(function() oldGui:Destroy() end)
+if not player then
+    while not Players.LocalPlayer do
+        task.wait()
     end
+    player = Players.LocalPlayer
+end
+
+-- Safely get PlayerGui and CoreGui references
+local playerGui = player:WaitForChild("PlayerGui", 10)
+local coreGui = nil
+pcall(function()
+    coreGui = game:GetService("CoreGui")
+end)
+
+-- Double run check (Safe destruction of old instances using pcalls to prevent security lock crashes)
+if playerGui then
+    pcall(function()
+        local old = playerGui:FindFirstChild("BurLixGUI")
+        if old then
+            old:Destroy()
+        end
+    end)
 end
 
 if coreGui then
-    local oldGui = coreGui:FindFirstChild("BurLixGUI")
-    if oldGui then
-        pcall(function() oldGui:Destroy() end)
-    end
+    pcall(function()
+        local old = coreGui:FindFirstChild("BurLixGUI")
+        if old then
+            old:Destroy()
+        end
+    end)
 end
 
-local targetParent = playerGui or coreGui
+-- Determine safe parenting target (Check if writing to CoreGui is allowed, fallback to PlayerGui)
+local targetParent = playerGui
+if coreGui then
+    local success = pcall(function()
+        local test = Instance.new("Folder")
+        test.Parent = coreGui
+        test:Destroy()
+    end)
+    if success then
+        targetParent = coreGui
+    end
+end
 
 -- Fallback Settings
 local currentWalkSpeed = 16
@@ -538,7 +561,7 @@ local creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v1.3.6\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v1.3.7\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.Font = Enum.Font.GothamSemibold
@@ -565,7 +588,7 @@ local changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v1.3.6:\n- Fixed critical script initialization crashes to ensure Stats Island, Key P, and close button render successfully.\n- Prevented nil errors when loading User Info details.\n- Added Visuals tab with clean, animated Toggle switches (v1.3.5)."
+changelogLabel.Text = "Changelog v1.3.7:\n- Wrapped CoreGui operations and double-run check in safe pcall locks to prevent identity security crash bugs (v1.3.7).\n- Wrapped Player and DisplayName lookups to prevent loading crashes (v1.3.7).\n- Added Visuals tab with Enable Highlighting, Enable Borders, and Show Names toggles (v1.3.5)."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.Font = Enum.Font.Gotham

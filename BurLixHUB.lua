@@ -338,3 +338,10 @@ UserInputService.InputChanged:Connect(function(input)
         update(input)
     end
 end)
+
+-- Toggle Menu Visibility with Right Shift
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == Enum.KeyCode.RightShift then
+        mainFrame.Visible = not mainFrame.Visible
+    end
+end)

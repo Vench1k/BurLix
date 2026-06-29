@@ -18,36 +18,39 @@ if not player then
 end
 
 -- Safely get PlayerGui and CoreGui references
-local playerGui = player:WaitForChild("PlayerGui", 10)
+local playerGui = player:WaitForChild("PlayerGui")
 local coreGui = nil
 pcall(function()
     coreGui = game:GetService("CoreGui")
 end)
 
--- Double run check (Safe destruction of old instances using pcalls to prevent security lock crashes)
-if playerGui then
-    pcall(function()
-        local old = playerGui:FindFirstChild("BurLixGUI")
-        if old then
-            old:Destroy()
+-- Double run check (Safe destruction of old instances using loop cleanup and pcall locks)
+pcall(function()
+    if playerGui then
+        for _, child in ipairs(playerGui:GetChildren()) do
+            if child.Name == "BurLixGUI" then
+                child:Destroy()
+            end
         end
-    end)
-end
+    end
+end)
 
-if coreGui then
-    pcall(function()
-        local old = coreGui:FindFirstChild("BurLixGUI")
-        if old then
-            old:Destroy()
+pcall(function()
+    if coreGui then
+        for _, child in ipairs(coreGui:GetChildren()) do
+            if child.Name == "BurLixGUI" then
+                child:Destroy()
+            end
         end
-    end)
-end
+    end
+end)
 
 -- Determine safe parenting target (Check if writing to CoreGui is allowed, fallback to PlayerGui)
 local targetParent = playerGui
 if coreGui then
     local success = pcall(function()
-        local test = Instance.new("Folder")
+        local test = Instance.new("ScreenGui")
+        test.Name = "TestBurLix"
         test.Parent = coreGui
         test:Destroy()
     end)
@@ -109,7 +112,7 @@ titleText.BackgroundTransparency = 1
 titleText.Text = "BurLix HUB"
 titleText.TextColor3 = Color3.fromRGB(240, 240, 245)
 titleText.TextSize = 18
-titleText.Font = Enum.Font.GothamBold
+titleText.Font = Enum.Font.SourceSansBold
 titleText.TextXAlignment = Enum.TextXAlignment.Left
 titleText.Parent = titleBar
 
@@ -131,7 +134,7 @@ closeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
 closeButton.Text = "X"
 closeButton.TextColor3 = Color3.fromRGB(240, 240, 245)
 closeButton.TextSize = 12
-closeButton.Font = Enum.Font.GothamBold
+closeButton.Font = Enum.Font.SourceSansBold
 closeButton.Parent = titleBar
 
 local closeCorner = Instance.new("UICorner")
@@ -205,7 +208,7 @@ local function createTab(name, layoutOrder, canvasHeight)
     btn.Text = name
     btn.TextColor3 = Color3.fromRGB(220, 220, 225)
     btn.TextSize = 13
-    btn.Font = Enum.Font.GothamSemibold
+    btn.Font = Enum.Font.SourceSansBold
     btn.LayoutOrder = layoutOrder
     btn.Parent = navPanel
 
@@ -268,7 +271,7 @@ local function createSlider(tabFrame, name, minVal, maxVal, defaultVal, layoutOr
     label.Text = name .. ": " .. tostring(defaultVal)
     label.TextColor3 = Color3.fromRGB(220, 220, 225)
     label.TextSize = 14
-    label.Font = Enum.Font.GothamSemibold
+    label.Font = Enum.Font.SourceSansBold
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = row
     
@@ -360,7 +363,7 @@ local function createToggle(tabFrame, name, defaultVal, layoutOrder, onChange)
     label.Text = name
     label.TextColor3 = Color3.fromRGB(220, 220, 225)
     label.TextSize = 14
-    label.Font = Enum.Font.GothamSemibold
+    label.Font = Enum.Font.SourceSansBold
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = row
     
@@ -492,7 +495,7 @@ resetButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 resetButton.Text = "Reset Properties to Default"
 resetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 resetButton.TextSize = 14
-resetButton.Font = Enum.Font.GothamBold
+resetButton.Font = Enum.Font.SourceSansBold
 resetButton.Parent = resetRow
 
 local resetBtnCorner = Instance.new("UICorner")
@@ -537,7 +540,7 @@ resetWorldButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 resetWorldButton.Text = "Reset World to Default"
 resetWorldButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 resetWorldButton.TextSize = 14
-resetWorldButton.Font = Enum.Font.GothamBold
+resetWorldButton.Font = Enum.Font.SourceSansBold
 resetWorldButton.Parent = resetWorldRow
 
 local resetWorldBtnCorner = Instance.new("UICorner")
@@ -561,10 +564,10 @@ local creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v1.3.7\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v1.3.8\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
-creatorsLabel.Font = Enum.Font.GothamSemibold
+creatorsLabel.Font = Enum.Font.SourceSansBold
 creatorsLabel.TextXAlignment = Enum.TextXAlignment.Left
 creatorsLabel.TextYAlignment = Enum.TextYAlignment.Top
 creatorsLabel.LineHeight = 1.3
@@ -577,7 +580,7 @@ thankYouLabel.BackgroundTransparency = 1
 thankYouLabel.Text = "Thank you for using BurLix HUB."
 thankYouLabel.TextColor3 = Color3.fromRGB(150, 150, 155)
 thankYouLabel.TextSize = 12
-thankYouLabel.Font = Enum.Font.GothamItalic
+thankYouLabel.Font = Enum.Font.SourceSans
 thankYouLabel.TextXAlignment = Enum.TextXAlignment.Left
 thankYouLabel.Parent = creatorsCard
 
@@ -588,10 +591,10 @@ local changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v1.3.7:\n- Wrapped CoreGui operations and double-run check in safe pcall locks to prevent identity security crash bugs (v1.3.7).\n- Wrapped Player and DisplayName lookups to prevent loading crashes (v1.3.7).\n- Added Visuals tab with Enable Highlighting, Enable Borders, and Show Names toggles (v1.3.5)."
+changelogLabel.Text = "Changelog v1.3.8:\n- Upgraded fonts to SourceSans/SourceSansBold for maximum compatibility across all Roblox clients.\n- Reverted to standard, reliable PlayerGui waiting on startup to prevent parenting issues.\n- Added Visuals tab with Enable Highlighting, Enable Borders, and Show Names toggles (v1.3.5)."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
-changelogLabel.Font = Enum.Font.Gotham
+changelogLabel.Font = Enum.Font.SourceSans
 changelogLabel.TextXAlignment = Enum.TextXAlignment.Left
 changelogLabel.TextYAlignment = Enum.TextYAlignment.Top
 changelogLabel.LineHeight = 1.3
@@ -615,7 +618,7 @@ end)
 infoLabel.Text = string.format("User: %s\nDisplay: %s\nAccount Age: %s days\nPlatform: Roblox Client", username, displayName, tostring(accountAge))
 infoLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 infoLabel.TextSize = 13
-infoLabel.Font = Enum.Font.Gotham
+infoLabel.Font = Enum.Font.SourceSans
 infoLabel.TextXAlignment = Enum.TextXAlignment.Left
 infoLabel.TextYAlignment = Enum.TextYAlignment.Top
 infoLabel.LineHeight = 1.3
@@ -676,7 +679,7 @@ local function createIslandLabel(text, sizeX, layoutOrder)
     label.Text = text
     label.TextColor3 = Color3.fromRGB(220, 220, 225)
     label.TextSize = 12
-    label.Font = Enum.Font.GothamSemibold
+    label.Font = Enum.Font.SourceSansBold
     label.LayoutOrder = layoutOrder
     label.Parent = islandFrame
     return label
@@ -707,7 +710,7 @@ islandToggle.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 islandToggle.Text = "Toggle"
 islandToggle.TextColor3 = Color3.fromRGB(240, 240, 245)
 islandToggle.TextSize = 11
-islandToggle.Font = Enum.Font.GothamBold
+islandToggle.Font = Enum.Font.SourceSansBold
 islandToggle.LayoutOrder = 6
 islandToggle.Parent = islandFrame
 

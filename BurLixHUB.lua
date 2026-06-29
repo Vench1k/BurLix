@@ -74,6 +74,9 @@ local highlightEnabled = false
 local bordersEnabled = false
 local namesEnabled = false
 
+-- Connections list to disconnect on unload to prevent leaks
+local connections = {}
+
 -- Create GUI Elements early to guarantee UI is loaded
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "BurLixGUI"
@@ -114,7 +117,7 @@ titleText.Name = "TitleText"
 titleText.Size = UDim2.new(1, -60, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "BurLix HUB"
+titleText.Text = "BurLix HUB v1.4.0"
 titleText.TextColor3 = Color3.fromRGB(240, 240, 245)
 titleText.TextSize = 18
 titleText.Font = Enum.Font.SourceSansBold
@@ -413,7 +416,7 @@ end
 -- Create Tabs (Decreased Authors tab canvas height since Reset buttons are removed)
 local playerTab = createTab("Player", 1, 200)
 local worldTab = createTab("World", 2, 200)
-local authorsTab = createTab("Authors", 3, 500)
+local authorsTab = createTab("Authors", 3, 520)
 local visualsTab = createTab("Visuals", 4, 200)
 
 -- DEFAULT TAB SETTINGS
@@ -447,7 +450,7 @@ task.spawn(function()
 end)
 
 -- Re-hook humanoid and re-apply settings on character respawn (preserving slider settings)
-player.CharacterAdded:Connect(function(newCharacter)
+table.insert(connections, player.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
     local hum = newCharacter:WaitForChild("Humanoid", 10)
     if hum then
@@ -462,11 +465,10 @@ player.CharacterAdded:Connect(function(newCharacter)
             end
         end)
     end
-end)
+end))
 
 -- Helper function to apply visuals to a single player character
-local function updateCharacterVisuals(otherPlayer, char)
-    if otherPlayer == player then return end -- Don't highlight local player
+local function updateCharacterVisuals(targetPlayer, char)
     if not char then return end
     
     -- Outline/Fill highlight handling
@@ -488,10 +490,10 @@ local function updateCharacterVisuals(otherPlayer, char)
     end
     
     -- BillboardGui (Names) overhead tag handling
-    local head = char:WaitForChild("Head", 5)
-    if head then
-        local billboard = head:FindFirstChild("BurLixNameTag")
-        if namesEnabled then
+    if namesEnabled then
+        local head = char:FindFirstChild("Head") or char:WaitForChild("Head", 2)
+        if head then
+            local billboard = head:FindFirstChild("BurLixNameTag")
             if not billboard then
                 billboard = Instance.new("BillboardGui")
                 billboard.Name = "BurLixNameTag"
@@ -502,17 +504,22 @@ local function updateCharacterVisuals(otherPlayer, char)
                 local nameLabel = Instance.new("TextLabel")
                 nameLabel.Size = UDim2.new(1, 0, 1, 0)
                 nameLabel.BackgroundTransparency = 1
-                nameLabel.Text = otherPlayer.DisplayName or otherPlayer.Name
+                nameLabel.Text = targetPlayer.DisplayName or targetPlayer.Name
                 nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
                 nameLabel.TextSize = 14
                 nameLabel.Font = Enum.Font.SourceSansBold
                 nameLabel.TextStrokeTransparency = 0
                 nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                nameLabel.TextWrapped = true
                 nameLabel.Parent = billboard
                 
                 billboard.Parent = head
             end
-        else
+        end
+    else
+        local head = char:FindFirstChild("Head")
+        if head then
+            local billboard = head:FindFirstChild("BurLixNameTag")
             if billboard then
                 billboard:Destroy()
             end
@@ -520,7 +527,7 @@ local function updateCharacterVisuals(otherPlayer, char)
     end
 end
 
--- Refresh visuals for all other players currently in game
+-- Refresh visuals for all players currently in game
 local function refreshAllVisuals()
     for _, p in ipairs(Players:GetPlayers()) do
         if p.Character then
@@ -533,17 +540,22 @@ end
 
 -- Hook player and character events to apply visuals dynamically
 local function onPlayerAdded(p)
-    if p == player then return end
-    p.CharacterAdded:Connect(function(char)
+    local conn = p.CharacterAdded:Connect(function(char)
         task.wait(0.5)
-        updateCharacterVisuals(p, char)
+        task.spawn(function()
+            updateCharacterVisuals(p, char)
+        end)
     end)
+    table.insert(connections, conn)
+    
     if p.Character then
-        updateCharacterVisuals(p, p.Character)
+        task.spawn(function()
+            updateCharacterVisuals(p, p.Character)
+        end)
     end
 end
 
-Players.PlayerAdded:Connect(onPlayerAdded)
+table.insert(connections, Players.PlayerAdded:Connect(onPlayerAdded))
 for _, p in ipairs(Players:GetPlayers()) do
     onPlayerAdded(p)
 end
@@ -592,13 +604,14 @@ local creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v1.3.9\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v1.4.0\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.Font = Enum.Font.SourceSansBold
 creatorsLabel.TextXAlignment = Enum.TextXAlignment.Left
 creatorsLabel.TextYAlignment = Enum.TextYAlignment.Top
 creatorsLabel.LineHeight = 1.3
+creatorsLabel.TextWrapped = true
 creatorsLabel.Parent = creatorsCard
 
 local thankYouLabel = Instance.new("TextLabel")
@@ -610,16 +623,17 @@ thankYouLabel.TextColor3 = Color3.fromRGB(150, 150, 155)
 thankYouLabel.TextSize = 12
 thankYouLabel.Font = Enum.Font.SourceSans
 thankYouLabel.TextXAlignment = Enum.TextXAlignment.Left
+thankYouLabel.TextWrapped = true
 thankYouLabel.Parent = creatorsCard
 
--- Changelog Card
-local changelogCard = createRow(authorsTab, "ChangelogCard", 185, 2)
+-- Changelog Card (Taller to comfortably fit wrapped version history text)
+local changelogCard = createRow(authorsTab, "ChangelogCard", 195, 2)
 
 local changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v1.3.9:\n- Added functional Visuals tab features using Roblox native highlights and overhead Billboards.\n- Removed all Reset buttons from Player and World tabs as requested.\n- Enabled TextWrapped on the changelog card to prevent text from clipping."
+changelogLabel.Text = "Changelog v1.4.0:\n- Fixed Visuals tab features (Highlighting, Borders, Names) to work correctly for all players (including local player).\n- Optimized character load checking to prevent initialization delays.\n- Enabled TextWrapped across all Changelog and Info labels to prevent clipping.\n- Confirmed removal of Reset to Default buttons across all tabs.\n- Added memory leak cleanup that disconnects all listeners on unload."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.Font = Enum.Font.SourceSans
@@ -651,6 +665,7 @@ infoLabel.Font = Enum.Font.SourceSans
 infoLabel.TextXAlignment = Enum.TextXAlignment.Left
 infoLabel.TextYAlignment = Enum.TextYAlignment.Top
 infoLabel.LineHeight = 1.3
+infoLabel.TextWrapped = true
 infoLabel.Parent = infoRow
 
 
@@ -757,26 +772,46 @@ local function toggleUI()
     mainFrame.Visible = not mainFrame.Visible
 end
 
-islandToggle.MouseButton1Click:Connect(toggleUI)
+table.insert(connections, islandToggle.MouseButton1Click:Connect(toggleUI))
 
--- Completely unload the script / destroy GUI on Close Button click (With active visuals cleanup)
-closeButton.MouseButton1Click:Connect(function()
+-- Completely unload the script / destroy GUI on Close Button click (With active connections & visuals cleanup)
+local unloaded = false
+local function unload()
+    if unloaded then return end
+    unloaded = true
+    
     highlightEnabled = false
     bordersEnabled = false
     namesEnabled = false
     pcall(refreshAllVisuals)
-    screenGui:Destroy()
-end)
+    
+    -- Disconnect all active connections
+    for _, conn in ipairs(connections) do
+        if conn and conn.Connected then
+            pcall(function() conn:Disconnect() end)
+        end
+    end
+    table.clear(connections)
+    
+    pcall(function()
+        if screenGui and screenGui.Parent then
+            screenGui:Destroy()
+        end
+    end)
+end
+
+table.insert(connections, closeButton.MouseButton1Click:Connect(unload))
+table.insert(connections, screenGui.Destroying:Connect(unload))
 
 -- Toggle Menu Visibility with Key P
-UserInputService.InputBegan:Connect(function(input)
+table.insert(connections, UserInputService.InputBegan:Connect(function(input)
     if input.KeyCode == Enum.KeyCode.P then
         toggleUI()
     end
-end)
+end))
 
 -- Main Frame Dragging Logic
-local dragging
+local dragging = false
 local dragInput
 local dragStart
 local startPos
@@ -786,28 +821,32 @@ local function updateMain(input)
     mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 end
 
-titleBar.InputBegan:Connect(function(input)
+table.insert(connections, titleBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
         dragStart = input.Position
         startPos = mainFrame.Position
         
-        input.Changed:Connect(function()
+        local changedConn
+        changedConn = input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
                 dragging = false
+                if changedConn then
+                    changedConn:Disconnect()
+                end
             end
         end)
     end
-end)
+end))
 
-titleBar.InputChanged:Connect(function(input)
+table.insert(connections, titleBar.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
         dragInput = input
     end
-end)
+end))
 
 -- Island Dragging Logic
-local islandDragging
+local islandDragging = false
 local islandDragInput
 local islandDragStart
 local islandStartPos
@@ -817,39 +856,43 @@ local function updateIsland(input)
     islandFrame.Position = UDim2.new(islandStartPos.X.Scale, islandStartPos.X.Offset + delta.X, islandStartPos.Y.Scale, islandStartPos.Y.Offset + delta.Y)
 end
 
-islandFrame.InputBegan:Connect(function(input)
+table.insert(connections, islandFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         islandDragging = true
         islandDragStart = input.Position
         islandStartPos = islandFrame.Position
         
-        input.Changed:Connect(function()
+        local changedConn
+        changedConn = input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
                 islandDragging = false
+                if changedConn then
+                    changedConn:Disconnect()
+                end
             end
         end)
     end
-end)
+end))
 
-islandFrame.InputChanged:Connect(function(input)
+table.insert(connections, islandFrame.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
         islandDragInput = input
     end
-end)
+end))
 
 -- Bind combined UserInput drag updates
-UserInputService.InputChanged:Connect(function(input)
+table.insert(connections, UserInputService.InputChanged:Connect(function(input)
     if input == dragInput and dragging then
         updateMain(input)
     elseif input == islandDragInput and islandDragging then
         updateIsland(input)
     end
-end)
+end))
 
 -- FPS and Ping Tracking Logic (Using high performance os.clock() instead of tick())
 local lastIteration = os.clock()
 local frameCount = 0
-RunService.RenderStepped:Connect(function()
+table.insert(connections, RunService.RenderStepped:Connect(function()
     frameCount = frameCount + 1
     local currentTime = os.clock()
     if currentTime - lastIteration >= 1 then
@@ -865,4 +908,4 @@ RunService.RenderStepped:Connect(function()
         end)
         islandPing.Text = "Ping: " .. string.format("%.0f ms", ping * 1000)
     end
-end)
+end))

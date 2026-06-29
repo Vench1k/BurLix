@@ -75,6 +75,19 @@ local bordersEnabled = false
 local namesEnabled = false
 local boxesEnabled = false
 
+-- Visuals Customization Settings
+local highlightColor = Color3.fromRGB(80, 80, 250)
+local highlightTransparency = 0.5
+
+local borderColor = Color3.fromRGB(255, 255, 255)
+local borderTransparency = 0
+
+local nameColor = Color3.fromRGB(255, 255, 255)
+local nameSize = 14
+
+local boxColor = Color3.fromRGB(80, 80, 250)
+local boxThickness = 1.5
+
 -- Connections list to disconnect on unload to prevent leaks
 local connections = {}
 
@@ -118,7 +131,7 @@ titleText.Name = "TitleText"
 titleText.Size = UDim2.new(1, -60, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "BurLix HUB v1.4.2"
+titleText.Text = "BurLix HUB v1.4.3"
 titleText.TextColor3 = Color3.fromRGB(240, 240, 245)
 titleText.TextSize = 18
 titleText.Font = Enum.Font.SourceSansBold
@@ -362,7 +375,7 @@ local function createSlider(tabFrame, name, minVal, maxVal, defaultVal, layoutOr
 end
 
 -- Helper Function to Create Toggles
-local function createToggle(tabFrame, name, defaultVal, layoutOrder, onChange)
+local function createToggle(tabFrame, name, defaultVal, layoutOrder, onChange, onRightClick)
     local row = createRow(tabFrame, name .. "Row", 45, layoutOrder)
     
     local label = Instance.new("TextLabel")
@@ -411,14 +424,199 @@ local function createToggle(tabFrame, name, defaultVal, layoutOrder, onChange)
         onChange(enabled)
     end)
     
+    if onRightClick then
+        table.insert(connections, row.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton2 then
+                onRightClick()
+            end
+        end))
+        table.insert(connections, label.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton2 then
+                onRightClick()
+            end
+        end))
+    end
+    
     return row
+end
+
+-- Helper Function to Create Settings Panel (Color picker + Value Slider)
+local function createSettingsPanel(tabFrame, layoutOrder, onColorChange, valueName, minVal, maxVal, defaultVal, onValueChange)
+    local panel = Instance.new("Frame")
+    panel.Name = "SettingsPanel"
+    panel.Size = UDim2.new(1, 0, 0, 85)
+    panel.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    panel.BorderSizePixel = 0
+    panel.LayoutOrder = layoutOrder
+    panel.Visible = false
+    panel.Parent = tabFrame
+    
+    local panelCorner = Instance.new("UICorner")
+    panelCorner.CornerRadius = UDim.new(0, 3)
+    panelCorner.Parent = panel
+    
+    -- 1. Color Picker Row
+    local colorLabel = Instance.new("TextLabel")
+    colorLabel.Size = UDim2.new(0, 50, 0, 30)
+    colorLabel.Position = UDim2.new(0, 10, 0, 5)
+    colorLabel.BackgroundTransparency = 1
+    colorLabel.Text = "Color:"
+    colorLabel.TextColor3 = Color3.fromRGB(180, 180, 185)
+    colorLabel.TextSize = 12
+    colorLabel.Font = Enum.Font.SourceSansBold
+    colorLabel.TextXAlignment = Enum.TextXAlignment.Left
+    colorLabel.Parent = panel
+    
+    local colors = {
+        Color3.fromRGB(80, 80, 250),   -- Blue
+        Color3.fromRGB(250, 80, 80),   -- Red
+        Color3.fromRGB(80, 250, 80),   -- Green
+        Color3.fromRGB(250, 250, 80),  -- Yellow
+        Color3.fromRGB(255, 255, 255)  -- White
+    }
+    
+    local buttonsContainer = Instance.new("Frame")
+    buttonsContainer.Size = UDim2.new(1, -70, 0, 30)
+    buttonsContainer.Position = UDim2.new(0, 60, 0, 5)
+    buttonsContainer.BackgroundTransparency = 1
+    buttonsContainer.Parent = panel
+    
+    local gridLayout = Instance.new("UIListLayout")
+    gridLayout.FillDirection = Enum.FillDirection.Horizontal
+    gridLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    gridLayout.Padding = UDim.new(0, 8)
+    gridLayout.Parent = buttonsContainer
+    
+    for _, color in ipairs(colors) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 18, 0, 18)
+        btn.BackgroundColor3 = color
+        btn.Text = ""
+        btn.Parent = buttonsContainer
+        
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(1, 0)
+        btnCorner.Parent = btn
+        
+        -- Border to indicate selected color
+        local stroke = Instance.new("UIStroke")
+        stroke.Thickness = 1.5
+        stroke.Color = Color3.fromRGB(35, 35, 40)
+        stroke.Parent = btn
+        
+        btn.MouseButton1Click:Connect(function()
+            onColorChange(color)
+            for _, child in ipairs(buttonsContainer:GetChildren()) do
+                if child:IsA("TextButton") then
+                    local s = child:FindFirstChild("UIStroke")
+                    if s then
+                        s.Color = (child == btn) and Color3.fromRGB(240, 240, 245) or Color3.fromRGB(35, 35, 40)
+                    end
+                end
+            end
+        end)
+    end
+    
+    -- 2. Value Slider (Thickness/Size/Transparency)
+    local sliderLabel = Instance.new("TextLabel")
+    sliderLabel.Size = UDim2.new(0, 80, 0, 20)
+    sliderLabel.Position = UDim2.new(0, 10, 0, 45)
+    sliderLabel.BackgroundTransparency = 1
+    sliderLabel.Text = valueName .. ": " .. tostring(defaultVal)
+    sliderLabel.TextColor3 = Color3.fromRGB(180, 180, 185)
+    sliderLabel.TextSize = 12
+    sliderLabel.Font = Enum.Font.SourceSansBold
+    sliderLabel.TextXAlignment = Enum.TextXAlignment.Left
+    sliderLabel.Parent = panel
+    
+    local sliderBar = Instance.new("Frame")
+    sliderBar.Size = UDim2.new(1, -110, 0, 6)
+    sliderBar.Position = UDim2.new(0, 100, 0, 52)
+    sliderBar.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    sliderBar.BorderSizePixel = 0
+    sliderBar.Parent = panel
+    
+    local sliderBarCorner = Instance.new("UICorner")
+    sliderBarCorner.CornerRadius = UDim.new(0, 3)
+    sliderBarCorner.Parent = sliderBar
+    
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Size = UDim2.new(0, 0, 1, 0)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(80, 80, 250)
+    sliderFill.BorderSizePixel = 0
+    sliderFill.Parent = sliderBar
+    
+    local sliderFillCorner = Instance.new("UICorner")
+    sliderFillCorner.CornerRadius = UDim.new(0, 3)
+    sliderFillCorner.Parent = sliderFill
+    
+    local sliderButton = Instance.new("Frame")
+    sliderButton.Size = UDim2.new(0, 12, 0, 12)
+    sliderButton.Position = UDim2.new(0, -6, 0.5, -6)
+    sliderButton.BackgroundColor3 = Color3.fromRGB(240, 240, 245)
+    sliderButton.BorderSizePixel = 0
+    sliderButton.Parent = sliderBar
+    
+    local sliderBtnCorner = Instance.new("UICorner")
+    sliderBtnCorner.CornerRadius = UDim.new(1, 0)
+    sliderBtnCorner.Parent = sliderButton
+    
+    local function updateSettingsSlider(percentage)
+        percentage = math.clamp(percentage, 0, 1)
+        sliderFill.Size = UDim2.new(percentage, 0, 1, 0)
+        sliderButton.Position = UDim2.new(percentage, -6, 0.5, -6)
+        
+        local val
+        if minVal == 0 and maxVal == 1 then
+            val = math.round((minVal + (maxVal - minVal) * percentage) * 10) / 10
+        else
+            val = math.round(minVal + (maxVal - minVal) * percentage)
+        end
+        
+        sliderLabel.Text = valueName .. ": " .. tostring(val)
+        onValueChange(val)
+    end
+    
+    local initialPercent = (defaultVal - minVal) / (maxVal - minVal)
+    updateSettingsSlider(initialPercent)
+    
+    local active = false
+    
+    local function processInput(input)
+        local barSize = sliderBar.AbsoluteSize.X
+        local barPos = sliderBar.AbsolutePosition.X
+        local mousePos = input.Position.X
+        local percentage = (mousePos - barPos) / barSize
+        updateSettingsSlider(percentage)
+    end
+    
+    table.insert(connections, sliderBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            active = true
+            processInput(input)
+        end
+    end))
+    
+    table.insert(connections, UserInputService.InputChanged:Connect(function(input)
+        if active and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            processInput(input)
+        end
+    end))
+    
+    table.insert(connections, UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            active = false
+        end
+    end))
+    
+    return panel
 end
 
 -- Create Tabs (Decreased Authors tab canvas height since Reset buttons are removed)
 local playerTab = createTab("Player", 1, 200)
 local worldTab = createTab("World", 2, 200)
 local authorsTab = createTab("Authors", 3, 520)
-local visualsTab = createTab("Visuals", 4, 250)
+local visualsTab = createTab("Visuals", 4, 600)
 
 -- DEFAULT TAB SETTINGS
 showTab("Player")
@@ -480,10 +678,10 @@ local function updateCharacterVisuals(targetPlayer, char)
             highlight.Name = "BurLixHighlight"
             highlight.Parent = char
         end
-        highlight.FillColor = Color3.fromRGB(80, 80, 250)
-        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-        highlight.FillTransparency = highlightEnabled and 0.5 or 1
-        highlight.OutlineTransparency = bordersEnabled and 0 or 1
+        highlight.FillColor = highlightColor
+        highlight.OutlineColor = borderColor
+        highlight.FillTransparency = highlightEnabled and highlightTransparency or 1
+        highlight.OutlineTransparency = bordersEnabled and borderTransparency or 1
     else
         if highlight then
             highlight:Destroy()
@@ -509,13 +707,21 @@ local function updateCharacterVisuals(targetPlayer, char)
                 boxFrame.Parent = boxGui
                 
                 local stroke = Instance.new("UIStroke")
-                stroke.Color = Color3.fromRGB(80, 80, 250)
-                stroke.Thickness = 1.5
                 stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
                 stroke.Parent = boxFrame
-                
-                boxGui.Parent = hrp
             end
+            
+            boxGui.Size = UDim2.new(4.5, 0, 6, 0)
+            local boxFrame = boxGui:FindFirstChild("Frame")
+            if boxFrame then
+                local stroke = boxFrame:FindFirstChild("UIStroke")
+                if stroke then
+                    stroke.Color = boxColor
+                    stroke.Thickness = boxThickness
+                end
+            end
+            
+            boxGui.Parent = hrp
         end
     else
         local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -542,17 +748,21 @@ local function updateCharacterVisuals(targetPlayer, char)
                 local nameLabel = Instance.new("TextLabel")
                 nameLabel.Size = UDim2.new(1, 0, 1, 0)
                 nameLabel.BackgroundTransparency = 1
-                nameLabel.Text = targetPlayer.DisplayName or targetPlayer.Name
-                nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-                nameLabel.TextSize = 14
                 nameLabel.Font = Enum.Font.SourceSansBold
                 nameLabel.TextStrokeTransparency = 0
                 nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
                 nameLabel.TextWrapped = true
                 nameLabel.Parent = billboard
-                
-                billboard.Parent = head
             end
+            
+            local nameLabel = billboard:FindFirstChild("TextLabel")
+            if nameLabel then
+                nameLabel.Text = targetPlayer.DisplayName or targetPlayer.Name
+                nameLabel.TextColor3 = nameColor
+                nameLabel.TextSize = nameSize
+            end
+            
+            billboard.Parent = head
         end
     else
         local head = char:FindFirstChild("Head")
@@ -642,7 +852,7 @@ local creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v1.4.2\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v1.4.3\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.Font = Enum.Font.SourceSansBold
@@ -671,7 +881,7 @@ local changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v1.4.2:\n- Updated Box ESP (Show Boxes) to be visible through walls using BillboardGui (AlwaysOnTop).\n- Fixed all Visuals (Highlighting, Borders, Names) to work correctly for all players (including local player).\n- Added memory leak cleanup that disconnects all listeners on unload."
+changelogLabel.Text = "Changelog v1.4.3:\n- Added right-click (MouseButton2) Settings Panel for all Visuals functions.\n- Added Color and Thickness/Size/Transparency sliders for Highlight, Border, Names, and Box ESP.\n- Increased Visuals tab canvas height to prevent layout clipping."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.Font = Enum.Font.SourceSans
@@ -709,27 +919,75 @@ infoLabel.Parent = infoRow
 
 -- ==================== VISUALS TAB CONTENTS ====================
 
--- Toggle for Highlighting
-createToggle(visualsTab, "Enable Highlighting", false, 1, function(state)
+local highlightSettingsPanel
+local highlightRow = createToggle(visualsTab, "Enable Highlighting", false, 1, function(state)
     highlightEnabled = state
     refreshAllVisuals()
+end, function()
+    if highlightSettingsPanel then
+        highlightSettingsPanel.Visible = not highlightSettingsPanel.Visible
+    end
 end)
 
--- Toggle for Borders
-createToggle(visualsTab, "Enable Borders", false, 2, function(state)
+highlightSettingsPanel = createSettingsPanel(visualsTab, 2, function(color)
+    highlightColor = color
+    refreshAllVisuals()
+end, "Transparency", 0.1, 0.9, highlightTransparency, function(val)
+    highlightTransparency = val
+    refreshAllVisuals()
+end)
+
+local borderSettingsPanel
+local borderRow = createToggle(visualsTab, "Enable Borders", false, 3, function(state)
     bordersEnabled = state
     refreshAllVisuals()
+end, function()
+    if borderSettingsPanel then
+        borderSettingsPanel.Visible = not borderSettingsPanel.Visible
+    end
 end)
 
--- Toggle for Show Names
-createToggle(visualsTab, "Show Names", false, 3, function(state)
-    namesEnabled = state
+borderSettingsPanel = createSettingsPanel(visualsTab, 4, function(color)
+    borderColor = color
+    refreshAllVisuals()
+end, "Transparency", 0, 0.9, borderTransparency, function(val)
+    borderTransparency = val
     refreshAllVisuals()
 end)
 
--- Toggle for Show Boxes
-createToggle(visualsTab, "Show Boxes", false, 4, function(state)
+local nameSettingsPanel
+local nameRow = createToggle(visualsTab, "Show Names", false, 5, function(state)
+    namesEnabled = state
+    refreshAllVisuals()
+end, function()
+    if nameSettingsPanel then
+        nameSettingsPanel.Visible = not nameSettingsPanel.Visible
+    end
+end)
+
+nameSettingsPanel = createSettingsPanel(visualsTab, 6, function(color)
+    nameColor = color
+    refreshAllVisuals()
+end, "Font Size", 10, 24, nameSize, function(val)
+    nameSize = val
+    refreshAllVisuals()
+end)
+
+local boxSettingsPanel
+local boxRow = createToggle(visualsTab, "Show Boxes", false, 7, function(state)
     boxesEnabled = state
+    refreshAllVisuals()
+end, function()
+    if boxSettingsPanel then
+        boxSettingsPanel.Visible = not boxSettingsPanel.Visible
+    end
+end)
+
+boxSettingsPanel = createSettingsPanel(visualsTab, 8, function(color)
+    boxColor = color
+    refreshAllVisuals()
+end, "Thickness", 1, 5, boxThickness, function(val)
+    boxThickness = val
     refreshAllVisuals()
 end)
 

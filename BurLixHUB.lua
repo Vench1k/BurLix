@@ -33,17 +33,17 @@ end
 -- Main Frame
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 350, 0, 400)
-mainFrame.Position = UDim2.new(0.5, -175, 0.5, -200)
+mainFrame.Size = UDim2.new(0, 350, 0, 420)
+mainFrame.Position = UDim2.new(0.5, -175, 0.5, -210)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 mainFrame.Draggable = true -- Deprecated but simple fallback, custom drag implemented below
 mainFrame.Parent = screenGui
 
--- UI Corner for Main Frame
+-- UI Corner for Main Frame (Less rounded)
 local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 10)
+mainCorner.CornerRadius = UDim.new(0, 4)
 mainCorner.Parent = mainFrame
 
 -- Title Bar
@@ -55,7 +55,7 @@ titleBar.BorderSizePixel = 0
 titleBar.Parent = mainFrame
 
 local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = UDim.new(0, 10)
+titleCorner.CornerRadius = UDim.new(0, 4)
 titleCorner.Parent = titleBar
 
 -- Title Text
@@ -84,7 +84,7 @@ toggleButton.Font = Enum.Font.GothamBold
 toggleButton.Parent = titleBar
 
 local toggleCorner = Instance.new("UICorner")
-toggleCorner.CornerRadius = UDim.new(0, 5)
+toggleCorner.CornerRadius = UDim.new(0, 3)
 toggleCorner.Parent = toggleButton
 
 -- Content Container (Scrolling Frame)
@@ -104,7 +104,7 @@ listLayout.Padding = UDim.new(0, 10)
 listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 listLayout.Parent = container
 
--- Helper Function to Create Row Frames
+-- Helper Function to Create Row Frames (Less rounded)
 local function createRow(name, height, layoutOrder)
     local row = Instance.new("Frame")
     row.Name = name
@@ -115,89 +115,124 @@ local function createRow(name, height, layoutOrder)
     row.Parent = container
 
     local rowCorner = Instance.new("UICorner")
-    rowCorner.CornerRadius = UDim.new(0, 6)
+    rowCorner.CornerRadius = UDim.new(0, 3)
     rowCorner.Parent = row
 
     return row
 end
 
--- 1. WalkSpeed Section
-local wsRow = createRow("WalkSpeedRow", 60, 1)
+-- Helper Function to Create Sliders
+local function createSlider(name, minVal, maxVal, defaultVal, layoutOrder, onChange)
+    local row = createRow(name .. "Row", 70, layoutOrder)
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -20, 0, 25)
+    label.Position = UDim2.new(0, 10, 0, 5)
+    label.BackgroundTransparency = 1
+    label.Text = name .. ": " .. tostring(defaultVal)
+    label.TextColor3 = Color3.fromRGB(220, 220, 225)
+    label.TextSize = 14
+    label.Font = Enum.Font.GothamSemibold
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = row
+    
+    local sliderBar = Instance.new("Frame")
+    sliderBar.Size = UDim2.new(1, -20, 0, 8)
+    sliderBar.Position = UDim2.new(0, 10, 0, 40)
+    sliderBar.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    sliderBar.BorderSizePixel = 0
+    sliderBar.Parent = row
+    
+    local sliderBarCorner = Instance.new("UICorner")
+    sliderBarCorner.CornerRadius = UDim.new(0, 3)
+    sliderBarCorner.Parent = sliderBar
+    
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Size = UDim2.new(0, 0, 1, 0)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(80, 80, 250)
+    sliderFill.BorderSizePixel = 0
+    sliderFill.Parent = sliderBar
+    
+    local sliderFillCorner = Instance.new("UICorner")
+    sliderFillCorner.CornerRadius = UDim.new(0, 3)
+    sliderFillCorner.Parent = sliderFill
+    
+    local sliderButton = Instance.new("Frame")
+    sliderButton.Size = UDim2.new(0, 16, 0, 16)
+    sliderButton.Position = UDim2.new(0, -8, 0.5, -8)
+    sliderButton.BackgroundColor3 = Color3.fromRGB(240, 240, 245)
+    sliderButton.BorderSizePixel = 0
+    sliderButton.Parent = sliderBar
+    
+    local sliderBtnCorner = Instance.new("UICorner")
+    sliderBtnCorner.CornerRadius = UDim.new(1, 0)
+    sliderBtnCorner.Parent = sliderButton
+    
+    local function updateSlider(percentage)
+        percentage = math.clamp(percentage, 0, 1)
+        sliderFill.Size = UDim2.new(percentage, 0, 1, 0)
+        sliderButton.Position = UDim2.new(percentage, -8, 0.5, -8)
+        
+        local val = math.round(minVal + (maxVal - minVal) * percentage)
+        label.Text = name .. ": " .. tostring(val)
+        onChange(val)
+    end
+    
+    local initialPercent = (defaultVal - minVal) / (maxVal - minVal)
+    updateSlider(initialPercent)
+    
+    local active = false
+    
+    local function processInput(input)
+        local barSize = sliderBar.AbsoluteSize.X
+        local barPos = sliderBar.AbsolutePosition.X
+        local mousePos = input.Position.X
+        local percentage = (mousePos - barPos) / barSize
+        updateSlider(percentage)
+    end
+    
+    sliderBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            active = true
+            processInput(input)
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if active and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            processInput(input)
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            active = false
+        end
+    end)
 
-local wsLabel = Instance.new("TextLabel")
-wsLabel.Size = UDim2.new(0.5, 0, 1, 0)
-wsLabel.Position = UDim2.new(0, 10, 0, 0)
-wsLabel.BackgroundTransparency = 1
-wsLabel.Text = "Walk Speed"
-wsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
-wsLabel.TextSize = 14
-wsLabel.Font = Enum.Font.GothamSemibold
-wsLabel.TextXAlignment = Enum.TextXAlignment.Left
-wsLabel.Parent = wsRow
+    return row, updateSlider
+end
 
-local wsInput = Instance.new("TextBox")
-wsInput.Size = UDim2.new(0.4, -10, 0, 30)
-wsInput.Position = UDim2.new(0.6, 0, 0.5, -15)
-wsInput.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-wsInput.Text = tostring(humanoid.WalkSpeed)
-wsInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-wsInput.TextSize = 14
-wsInput.Font = Enum.Font.Gotham
-wsInput.ClearTextOnFocus = false
-wsInput.Parent = wsRow
-
-local wsInputCorner = Instance.new("UICorner")
-wsInputCorner.CornerRadius = UDim.new(0, 5)
-wsInputCorner.Parent = wsInput
-
-wsInput.FocusLost:Connect(function(enterPressed)
-    local speed = tonumber(wsInput.Text)
-    if speed and humanoid then
-        humanoid.WalkSpeed = speed
-    else
-        wsInput.Text = tostring(humanoid.WalkSpeed)
+-- 1. WalkSpeed Slider
+local wsRow, updateWSSlider = createSlider("Walk Speed", 16, 200, humanoid.WalkSpeed, 1, function(val)
+    if humanoid then
+        humanoid.WalkSpeed = val
     end
 end)
 
--- 2. JumpPower Section
-local jpRow = createRow("JumpPowerRow", 60, 2)
+-- 2. JumpPower Slider
+local isJumpPower = humanoid.UseJumpPower
+local minJump = isJumpPower and 0 or 0
+local maxJump = isJumpPower and 250 or 150
+local defaultJump = isJumpPower and humanoid.JumpPower or humanoid.JumpHeight
 
-local jpLabel = Instance.new("TextLabel")
-jpLabel.Size = UDim2.new(0.5, 0, 1, 0)
-jpLabel.Position = UDim2.new(0, 10, 0, 0)
-jpLabel.BackgroundTransparency = 1
-jpLabel.Text = "Jump Power"
-jpLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
-jpLabel.TextSize = 14
-jpLabel.Font = Enum.Font.GothamSemibold
-jpLabel.TextXAlignment = Enum.TextXAlignment.Left
-jpLabel.Parent = jpRow
-
-local jpInput = Instance.new("TextBox")
-jpInput.Size = UDim2.new(0.4, -10, 0, 30)
-jpInput.Position = UDim2.new(0.6, 0, 0.5, -15)
-jpInput.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-jpInput.Text = tostring(humanoid.UseJumpPower and humanoid.JumpPower or humanoid.JumpHeight)
-jpInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-jpInput.TextSize = 14
-jpInput.Font = Enum.Font.Gotham
-jpInput.ClearTextOnFocus = false
-jpInput.Parent = jpRow
-
-local jpInputCorner = Instance.new("UICorner")
-jpInputCorner.CornerRadius = UDim.new(0, 5)
-jpInputCorner.Parent = jpInput
-
-jpInput.FocusLost:Connect(function(enterPressed)
-    local power = tonumber(jpInput.Text)
-    if power and humanoid then
+local jpRow, updateJPSlider = createSlider("Jump Ability", minJump, maxJump, defaultJump, 2, function(val)
+    if humanoid then
         if humanoid.UseJumpPower then
-            humanoid.JumpPower = power
+            humanoid.JumpPower = val
         else
-            humanoid.JumpHeight = power
+            humanoid.JumpHeight = val
         end
-    else
-        jpInput.Text = tostring(humanoid.UseJumpPower and humanoid.JumpPower or humanoid.JumpHeight)
     end
 end)
 
@@ -215,19 +250,21 @@ resetButton.Font = Enum.Font.GothamBold
 resetButton.Parent = resetRow
 
 local resetBtnCorner = Instance.new("UICorner")
-resetBtnCorner.CornerRadius = UDim.new(0, 5)
+resetBtnCorner.CornerRadius = UDim.new(0, 3)
 resetBtnCorner.Parent = resetButton
 
 resetButton.MouseButton1Click:Connect(function()
     if humanoid then
         humanoid.WalkSpeed = 16
+        updateWSSlider((16 - 16) / (200 - 16))
+        
         if humanoid.UseJumpPower then
             humanoid.JumpPower = 50
+            updateJPSlider((50 - 0) / (250 - 0))
         else
             humanoid.JumpHeight = 7.2
+            updateJPSlider((7.2 - 0) / (150 - 0))
         end
-        wsInput.Text = "16"
-        jpInput.Text = tostring(humanoid.UseJumpPower and 50 or 7.2)
     end
 end)
 

@@ -9,42 +9,41 @@ local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
 
--- Anti-double-run check (Destroy old GUI if it exists)
-local successParent, playerGui = pcall(function() return player:WaitForChild("PlayerGui") end)
-local targetParent = (successParent and playerGui) or game:GetService("CoreGui")
-local oldGui = targetParent:FindFirstChild("BurLixGUI")
-if oldGui then
-    oldGui:Destroy()
+-- Anti-double-run check (Destroy old GUI if it exists in PlayerGui or CoreGui)
+local coreGui = nil
+pcall(function() coreGui = game:GetService("CoreGui") end)
+
+local playerGui = nil
+pcall(function() playerGui = player:WaitForChild("PlayerGui", 5) end)
+
+if playerGui then
+    local oldGui = playerGui:FindFirstChild("BurLixGUI")
+    if oldGui then
+        pcall(function() oldGui:Destroy() end)
+    end
 end
 
--- Initialize current settings
-local currentWalkSpeed = humanoid.WalkSpeed
-local isJumpPower = humanoid.UseJumpPower
-local currentJumpValue = isJumpPower and humanoid.JumpPower or humanoid.JumpHeight
-local minJump = 0
-local maxJump = isJumpPower and 250 or 150
-
--- Re-hook humanoid and re-apply settings on character respawn
-player.CharacterAdded:Connect(function(newCharacter)
-    character = newCharacter
-    humanoid = newCharacter:WaitForChild("Humanoid")
-    
-    -- Wait briefly for humanoid to load fully before applying settings
-    task.wait(0.5)
-    if humanoid then
-        humanoid.WalkSpeed = currentWalkSpeed
-        if humanoid.UseJumpPower then
-            humanoid.JumpPower = currentJumpValue
-        else
-            humanoid.JumpHeight = currentJumpValue
-        end
+if coreGui then
+    local oldGui = coreGui:FindFirstChild("BurLixGUI")
+    if oldGui then
+        pcall(function() oldGui:Destroy() end)
     end
-end)
+end
 
--- Create GUI Elements
+local targetParent = playerGui or coreGui
+
+-- Fallback Settings
+local currentWalkSpeed = 16
+local isJumpPower = true
+local currentJumpValue = 50
+local minJump = 0
+local maxJump = 250
+
+local humanoid = nil
+local character = nil
+
+-- Create GUI Elements early to guarantee UI is loaded
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "BurLixGUI"
 screenGui.ResetOnSpawn = false
@@ -58,7 +57,7 @@ mainFrame.Position = UDim2.new(0.5, -230, 0.5, -160)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
-mainFrame.Draggable = true -- Deprecated but simple fallback, custom drag implemented below
+mainFrame.Draggable = true
 mainFrame.Parent = screenGui
 
 -- UI Corner for Main Frame (Less rounded)
@@ -389,27 +388,76 @@ local visualsTab = createTab("Visuals", 4, 350)
 -- DEFAULT TAB SETTINGS
 showTab("Player")
 
+-- Sliders reference for async character loading updates
+local updateWSSliderUI = nil
+local updateJPSliderUI = nil
+
+-- Asynchronously wait for initial character and read default values safely
+task.spawn(function()
+    character = player.Character or player.CharacterAdded:Wait()
+    local hum = character:WaitForChild("Humanoid", 10)
+    if hum then
+        humanoid = hum
+        pcall(function()
+            currentWalkSpeed = hum.WalkSpeed
+            isJumpPower = hum.UseJumpPower
+            currentJumpValue = isJumpPower and hum.JumpPower or hum.JumpHeight
+            minJump = 0
+            maxJump = isJumpPower and 250 or 150
+            
+            if updateWSSliderUI then
+                updateWSSliderUI((currentWalkSpeed - 16) / (200 - 16))
+            end
+            if updateJPSliderUI then
+                updateJPSliderUI((currentJumpValue - minJump) / (maxJump - minJump))
+            end
+        end)
+    end
+end)
+
+-- Re-hook humanoid and re-apply settings on character respawn (preserving slider settings)
+player.CharacterAdded:Connect(function(newCharacter)
+    character = newCharacter
+    local hum = newCharacter:WaitForChild("Humanoid", 10)
+    if hum then
+        humanoid = hum
+        task.wait(0.5)
+        pcall(function()
+            hum.WalkSpeed = currentWalkSpeed
+            if hum.UseJumpPower then
+                hum.JumpPower = currentJumpValue
+            else
+                hum.JumpHeight = currentJumpValue
+            end
+        end)
+    end
+end)
+
 -- ==================== PLAYER TAB CONTENTS ====================
 
 -- WalkSpeed Slider
 local wsRow, updateWSSlider = createSlider(playerTab, "Walk Speed", 16, 200, currentWalkSpeed, 1, function(val)
     currentWalkSpeed = val
     if humanoid then
-        humanoid.WalkSpeed = val
+        pcall(function() humanoid.WalkSpeed = val end)
     end
 end)
+updateWSSliderUI = updateWSSlider
 
 -- JumpPower Slider
 local jpRow, updateJPSlider = createSlider(playerTab, "Jump Ability", minJump, maxJump, currentJumpValue, 2, function(val)
     currentJumpValue = val
     if humanoid then
-        if humanoid.UseJumpPower then
-            humanoid.JumpPower = val
-        else
-            humanoid.JumpHeight = val
-        end
+        pcall(function()
+            if humanoid.UseJumpPower then
+                humanoid.JumpPower = val
+            else
+                humanoid.JumpHeight = val
+            end
+        end)
     end
 end)
+updateJPSliderUI = updateJPSlider
 
 -- Reset Button
 local resetRow = createRow(playerTab, "ResetRow", 50, 3)
@@ -430,19 +478,21 @@ resetBtnCorner.Parent = resetButton
 
 resetButton.MouseButton1Click:Connect(function()
     if humanoid then
-        currentWalkSpeed = 16
-        humanoid.WalkSpeed = 16
-        updateWSSlider((16 - 16) / (200 - 16))
-        
-        if humanoid.UseJumpPower then
-            currentJumpValue = 50
-            humanoid.JumpPower = 50
-            updateJPSlider((50 - 0) / (250 - 0))
-        else
-            currentJumpValue = 7.2
-            humanoid.JumpHeight = 7.2
-            updateJPSlider((7.2 - 0) / (150 - 0))
-        end
+        pcall(function()
+            currentWalkSpeed = 16
+            humanoid.WalkSpeed = 16
+            updateWSSlider((16 - 16) / (200 - 16))
+            
+            if humanoid.UseJumpPower then
+                currentJumpValue = 50
+                humanoid.JumpPower = 50
+                updateJPSlider((50 - 0) / (250 - 0))
+            else
+                currentJumpValue = 7.2
+                humanoid.JumpHeight = 7.2
+                updateJPSlider((7.2 - 0) / (150 - 0))
+            end
+        end)
     end
 end)
 
@@ -451,7 +501,7 @@ end)
 
 -- Gravity Slider
 local gravitySliderRow, updateGravitySlider = createSlider(worldTab, "Gravity", 0, 500, Workspace.Gravity, 1, function(val)
-    Workspace.Gravity = val
+    pcall(function() Workspace.Gravity = val end)
 end)
 
 -- Reset World button
@@ -472,8 +522,10 @@ resetWorldBtnCorner.CornerRadius = UDim.new(0, 3)
 resetWorldBtnCorner.Parent = resetWorldButton
 
 resetWorldButton.MouseButton1Click:Connect(function()
-    Workspace.Gravity = 196.2
-    updateGravitySlider((196.2 - 0) / (500 - 0))
+    pcall(function()
+        Workspace.Gravity = 196.2
+        updateGravitySlider((196.2 - 0) / (500 - 0))
+    end)
 end)
 
 
@@ -486,7 +538,7 @@ local creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v1.3.5\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v1.3.6\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.Font = Enum.Font.GothamSemibold
@@ -507,13 +559,13 @@ thankYouLabel.TextXAlignment = Enum.TextXAlignment.Left
 thankYouLabel.Parent = creatorsCard
 
 -- Changelog Card
-local changelogCard = createRow(authorsTab, "ChangelogCard", 175, 2)
+local changelogCard = createRow(authorsTab, "ChangelogCard", 185, 2)
 
 local changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v1.3.5:\n- Added Visuals tab (v1.3.5).\n- Added Toggles for Enable Highlighting, Enable Borders, and Show Names (v1.3.5).\n- Implemented animated UI toggle switch component with TweenService transitions (v1.3.5)."
+changelogLabel.Text = "Changelog v1.3.6:\n- Fixed critical script initialization crashes to ensure Stats Island, Key P, and close button render successfully.\n- Prevented nil errors when loading User Info details.\n- Added Visuals tab with clean, animated Toggle switches (v1.3.5)."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.Font = Enum.Font.Gotham
@@ -529,7 +581,15 @@ local infoLabel = Instance.new("TextLabel")
 infoLabel.Size = UDim2.new(1, -20, 1, -10)
 infoLabel.Position = UDim2.new(0, 10, 0, 5)
 infoLabel.BackgroundTransparency = 1
-infoLabel.Text = string.format("User: %s\nDisplay: %s\nAccount Age: %d days\nPlatform: Roblox Client", player.Name, player.DisplayName, player.AccountAge)
+
+local username = player.Name or "Unknown"
+local displayName = player.DisplayName or username
+local accountAge = 0
+pcall(function()
+    accountAge = player.AccountAge or 0
+end)
+
+infoLabel.Text = string.format("User: %s\nDisplay: %s\nAccount Age: %s days\nPlatform: Roblox Client", username, displayName, tostring(accountAge))
 infoLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 infoLabel.TextSize = 13
 infoLabel.Font = Enum.Font.Gotham
@@ -611,7 +671,7 @@ islandSeparator.BorderSizePixel = 0
 islandSeparator.LayoutOrder = 2
 islandSeparator.Parent = islandFrame
 
-local islandUser = createIslandLabel(player.DisplayName, 80, 3)
+local islandUser = createIslandLabel(player.DisplayName or player.Name or "Player", 80, 3)
 islandUser.TextTruncate = Enum.TextTruncate.AtEnd
 
 local islandFPS = createIslandLabel("FPS: --", 50, 4)
@@ -737,7 +797,10 @@ RunService.RenderStepped:Connect(function()
         lastIteration = currentTime
         
         -- Approximate round-trip ping in milliseconds
-        local ping = player:GetNetworkPing()
+        local ping = 0
+        pcall(function()
+            ping = player:GetNetworkPing() or 0
+        end)
         islandPing.Text = "Ping: " .. string.format("%.0f ms", ping * 1000)
     end
 end)

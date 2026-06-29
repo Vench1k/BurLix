@@ -98,6 +98,14 @@ local maxJump = 250
 local humanoid = nil
 local character = nil
 
+-- Tab and Settings State variables
+local lastActiveTab = "Player"
+local activeTabName = "Player"
+local islandVisible = true
+local fpsVisible = true
+local pingVisible = true
+local menuKeybind = Enum.KeyCode.P
+
 -- Visuals State variables
 local highlightEnabled = false
 local bordersEnabled = false
@@ -163,7 +171,7 @@ titleText.Name = "TitleText"
 titleText.Size = UDim2.new(1, -60, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "BurLix HUB v1.4.9"
+titleText.Text = "BurLix HUB v1.5.0"
 titleText.TextColor3 = Color3.fromRGB(240, 240, 245)
 titleText.TextSize = 18
 titleText.Font = Enum.Font.SourceSansBold
@@ -197,10 +205,14 @@ settingsCorner.Parent = settingsButton
 
 -- Settings Button Hover Styles
 settingsButton.MouseEnter:Connect(function()
-    TweenService:Create(settingsButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(70, 70, 75)}):Play()
+    if activeTabName ~= "Settings" then
+        TweenService:Create(settingsButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(70, 70, 75)}):Play()
+    end
 end)
 settingsButton.MouseLeave:Connect(function()
-    TweenService:Create(settingsButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 50, 55)}):Play()
+    if activeTabName ~= "Settings" then
+        TweenService:Create(settingsButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 50, 55)}):Play()
+    end
 end)
 
 -- Close Button (X) to completely close the script
@@ -219,47 +231,7 @@ local closeCorner = Instance.new("UICorner")
 closeCorner.CornerRadius = UDim.new(0, 3)
 closeCorner.Parent = closeButton
 
--- Settings Popup Frame (Overlays ContentContainer)
-local settingsPopup = Instance.new("Frame")
-settingsPopup.Name = "SettingsPopup"
-settingsPopup.Size = UDim2.new(1, -110, 1, -45)
-settingsPopup.Position = UDim2.new(0, 110, 0, 45)
-settingsPopup.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-settingsPopup.BorderSizePixel = 0
-settingsPopup.Visible = false
-settingsPopup.Parent = mainFrame
-
-local popupCorner = Instance.new("UICorner")
-popupCorner.CornerRadius = UDim.new(0, 4)
-popupCorner.Parent = settingsPopup
-
-local popupTitle = Instance.new("TextLabel")
-popupTitle.Size = UDim2.new(1, -20, 0, 30)
-popupTitle.Position = UDim2.new(0, 15, 0, 10)
-popupTitle.BackgroundTransparency = 1
-popupTitle.Text = "Menu & Island Settings"
-popupTitle.TextColor3 = Color3.fromRGB(240, 240, 245)
-popupTitle.TextSize = 16
-popupTitle.Font = Enum.Font.SourceSansBold
-popupTitle.TextXAlignment = Enum.TextXAlignment.Left
-popupTitle.Parent = settingsPopup
-
-local popupContent = Instance.new("TextLabel")
-popupContent.Size = UDim2.new(1, -30, 1, -50)
-popupContent.Position = UDim2.new(0, 15, 0, 45)
-popupContent.BackgroundTransparency = 1
-popupContent.Text = "Settings are currently empty."
-popupContent.TextColor3 = Color3.fromRGB(150, 150, 155)
-popupContent.TextSize = 13
-popupContent.Font = Enum.Font.SourceSans
-popupContent.TextXAlignment = Enum.TextXAlignment.Left
-popupContent.TextYAlignment = Enum.TextYAlignment.Top
-popupContent.Parent = settingsPopup
-
--- Toggle visibility on settingsButton click
-settingsButton.MouseButton1Click:Connect(function()
-    settingsPopup.Visible = not settingsPopup.Visible
-end)
+-- Settings popup was removed in favor of a dedicated hidden Settings Tab
 
 -- Close Button Hover/Click Styles
 closeButton.MouseEnter:Connect(function()
@@ -307,9 +279,11 @@ contentContainer.Parent = mainFrame
 local tabs = {}
 
 local function showTab(tabName)
-    if settingsPopup then
-        settingsPopup.Visible = false
+    if tabName ~= "Settings" then
+        lastActiveTab = tabName
     end
+    activeTabName = tabName
+    
     for name, data in pairs(tabs) do
         if name == tabName then
             TweenService:Create(data.Button, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
@@ -323,13 +297,20 @@ local function showTab(tabName)
             data.Frame.Visible = false
         end
     end
+    
+    -- Highlight settings button if Settings tab is active
+    if settingsButton then
+        local targetColor = tabName == "Settings" and Color3.fromRGB(80, 80, 250) or Color3.fromRGB(50, 50, 55)
+        TweenService:Create(settingsButton, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
+    end
 end
 
 local function createTab(name, layoutOrder, canvasHeight)
     -- Navigation Button
     local btn = Instance.new("TextButton")
     btn.Name = name .. "TabButton"
-    btn.Size = UDim2.new(1, 0, 0, 32)
+    btn.Size = name == "Settings" and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 32)
+    btn.Visible = name ~= "Settings"
     btn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
     btn.BorderSizePixel = 0
     btn.Text = name
@@ -343,21 +324,23 @@ local function createTab(name, layoutOrder, canvasHeight)
     btnCorner.CornerRadius = UDim.new(0, 3)
     btnCorner.Parent = btn
 
-    -- Hover effect for tab button
-    local normalColor = Color3.fromRGB(45, 45, 50)
-    local hoverColor = Color3.fromRGB(52, 52, 58)
-    local activeColor = Color3.fromRGB(60, 60, 70)
-    
-    btn.MouseEnter:Connect(function()
-        if btn.BackgroundColor3 ~= activeColor then
-            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = hoverColor}):Play()
-        end
-    end)
-    btn.MouseLeave:Connect(function()
-        if btn.BackgroundColor3 ~= activeColor then
-            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = normalColor}):Play()
-        end
-    end)
+    -- Hover effect for tab button (only if visible)
+    if name ~= "Settings" then
+        local normalColor = Color3.fromRGB(45, 45, 50)
+        local hoverColor = Color3.fromRGB(52, 52, 58)
+        local activeColor = Color3.fromRGB(60, 60, 70)
+        
+        btn.MouseEnter:Connect(function()
+            if btn.BackgroundColor3 ~= activeColor then
+                TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = hoverColor}):Play()
+            end
+        end)
+        btn.MouseLeave:Connect(function()
+            if btn.BackgroundColor3 ~= activeColor then
+                TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = normalColor}):Play()
+            end
+        end)
+    end
 
     -- Content Frame
     local frame = Instance.new("ScrollingFrame")
@@ -881,6 +864,104 @@ local playerTab = createTab("Player", 1, 200)
 local worldTab = createTab("World", 2, 200)
 local authorsTab = createTab("Authors", 3, 520)
 local visualsTab = createTab("Visuals", 4, 850)
+local settingsTab = createTab("Settings", 5, 300)
+
+-- Settings Tab Content
+local settingsTitle = Instance.new("TextLabel")
+settingsTitle.Name = "SettingsTitle"
+settingsTitle.Size = UDim2.new(1, -20, 0, 30)
+settingsTitle.Position = UDim2.new(0, 10, 0, 10)
+settingsTitle.BackgroundTransparency = 1
+settingsTitle.Text = "Menu & Island Settings"
+settingsTitle.TextColor3 = Color3.fromRGB(240, 240, 245)
+settingsTitle.TextSize = 16
+settingsTitle.Font = Enum.Font.SourceSansBold
+settingsTitle.TextXAlignment = Enum.TextXAlignment.Left
+settingsTitle.LayoutOrder = 0
+settingsTitle.Parent = settingsTab
+
+local islandVisibleToggle = createToggle(settingsTab, "Show Top Island", true, 1, function(state)
+    islandVisible = state
+    if islandFrame then
+        islandFrame.Visible = state
+    end
+end)
+
+local fpsVisibleToggle = createToggle(settingsTab, "Show FPS Counter", true, 2, function(state)
+    fpsVisible = state
+    if islandFPS then
+        islandFPS.Visible = state
+    end
+end)
+
+local pingVisibleToggle = createToggle(settingsTab, "Show Ping Counter", true, 3, function(state)
+    pingVisible = state
+    if islandPing then
+        islandPing.Visible = state
+    end
+end)
+
+-- Keybind Row
+local keybindRow = createRow(settingsTab, "KeybindRow", 45, 4)
+
+local keybindLabel = Instance.new("TextLabel")
+keybindLabel.Size = UDim2.new(1, -100, 1, 0)
+keybindLabel.Position = UDim2.new(0, 10, 0, 0)
+keybindLabel.BackgroundTransparency = 1
+keybindLabel.Text = "Menu Toggle Keybind"
+keybindLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
+keybindLabel.TextSize = 14
+keybindLabel.Font = Enum.Font.SourceSansBold
+keybindLabel.TextXAlignment = Enum.TextXAlignment.Left
+keybindLabel.Parent = keybindRow
+
+local keybindInput = Instance.new("TextBox")
+keybindInput.Size = UDim2.new(0, 80, 0, 25)
+keybindInput.Position = UDim2.new(1, -90, 0.5, -12)
+keybindInput.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+keybindInput.BorderSizePixel = 0
+keybindInput.Text = "P"
+keybindInput.TextColor3 = Color3.fromRGB(240, 240, 245)
+keybindInput.TextSize = 12
+keybindInput.Font = Enum.Font.Code
+keybindInput.ClearTextOnFocus = false
+keybindInput.Parent = keybindRow
+
+local keybindCorner = Instance.new("UICorner")
+keybindCorner.CornerRadius = UDim.new(0, 3)
+keybindCorner.Parent = keybindInput
+
+local keybindStroke = Instance.new("UIStroke")
+keybindStroke.Thickness = 1
+keybindStroke.Color = Color3.fromRGB(55, 55, 60)
+keybindStroke.Parent = keybindInput
+
+table.insert(connections, keybindInput.FocusLost:Connect(function(enterPressed)
+    local text = keybindInput.Text:upper():gsub("%s+", "")
+    if #text == 1 then
+        local code = Enum.KeyCode[text]
+        if code then
+            menuKeybind = code
+            keybindInput.Text = text
+            keybindStroke.Color = Color3.fromRGB(50, 180, 50)
+            task.delay(0.5, function()
+                keybindStroke.Color = Color3.fromRGB(55, 55, 60)
+            end)
+            return
+        end
+    end
+    -- Revert
+    for _, code in ipairs(Enum.KeyCode:GetEnumItems()) do
+        if code == menuKeybind then
+            keybindInput.Text = code.Name
+            break
+        end
+    end
+    keybindStroke.Color = Color3.fromRGB(180, 50, 50)
+    task.delay(0.5, function()
+        keybindStroke.Color = Color3.fromRGB(55, 55, 60)
+    end)
+end))
 
 -- DEFAULT TAB SETTINGS
 showTab("Player")
@@ -1132,7 +1213,7 @@ local creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v1.4.9\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v1.5.0\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.Font = Enum.Font.SourceSansBold
@@ -1161,7 +1242,7 @@ local changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v1.4.9:\n- Expanded quick color presets palette to 12 popular color options.\n- Added a new Settings Button (⚙) in the title bar that opens a menu and island settings panel."
+changelogLabel.Text = "Changelog v1.5.0:\n- Moved settings into a dedicated, clean Settings Tab.\n- Added Show Top Island, Show FPS, Show Ping, and customizable Menu Keybind settings."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.Font = Enum.Font.SourceSans
@@ -1190,6 +1271,7 @@ infoLabel.Text = string.format("User: %s\nDisplay: %s\nAccount Age: %s days\nPla
 infoLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 infoLabel.TextSize = 13
 infoLabel.Font = Enum.Font.SourceSans
+
 infoLabel.TextXAlignment = Enum.TextXAlignment.Left
 infoLabel.TextYAlignment = Enum.TextYAlignment.Top
 infoLabel.LineHeight = 1.3
@@ -1446,11 +1528,18 @@ local function unload()
 end
 
 table.insert(connections, closeButton.MouseButton1Click:Connect(unload))
+table.insert(connections, settingsButton.MouseButton1Click:Connect(function()
+    if activeTabName == "Settings" then
+        showTab(lastActiveTab)
+    else
+        showTab("Settings")
+    end
+end))
 table.insert(connections, screenGui.Destroying:Connect(unload))
 
--- Toggle Menu Visibility with Key P
+-- Toggle Menu Visibility with Keybind
 table.insert(connections, UserInputService.InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.P then
+    if input.KeyCode == menuKeybind then
         toggleUI()
     end
 end))

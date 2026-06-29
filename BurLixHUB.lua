@@ -78,15 +78,18 @@ local boxesEnabled = false
 -- Visuals Customization Settings
 local highlightColor = Color3.fromRGB(80, 80, 250)
 local highlightTransparency = 0.5
+local highlightOutlineTransparency = 0.5
 
 local borderColor = Color3.fromRGB(255, 255, 255)
 local borderTransparency = 0
 
 local nameColor = Color3.fromRGB(255, 255, 255)
 local nameSize = 14
+local nameStrokeThickness = 1.5
 
 local boxColor = Color3.fromRGB(80, 80, 250)
 local boxThickness = 1.5
+local boxTransparency = 0
 
 -- Connections list to disconnect on unload to prevent leaks
 local connections = {}
@@ -131,7 +134,7 @@ titleText.Name = "TitleText"
 titleText.Size = UDim2.new(1, -60, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "BurLix HUB v1.4.4"
+titleText.Text = "BurLix HUB v1.4.5"
 titleText.TextColor3 = Color3.fromRGB(240, 240, 245)
 titleText.TextSize = 18
 titleText.Font = Enum.Font.SourceSansBold
@@ -449,11 +452,15 @@ local function createToggle(tabFrame, name, defaultVal, layoutOrder, onChange, o
     return row
 end
 
--- Helper Function to Create Settings Panel (Color picker + Value Slider)
-local function createSettingsPanel(tabFrame, layoutOrder, onColorChange, valueName, minVal, maxVal, defaultVal, onValueChange)
+-- Helper Function to Create Settings Panel with RGB and custom sliders
+local function createSettingsPanel(tabFrame, layoutOrder, defaultColor, onColorChange, customSliders)
+    local slidersCount = 3 + #customSliders
+    local rowHeight = 24
+    local panelHeight = slidersCount * rowHeight + 10
+    
     local panel = Instance.new("Frame")
     panel.Name = "SettingsPanel"
-    panel.Size = UDim2.new(1, 0, 0, 85)
+    panel.Size = UDim2.new(1, 0, 0, panelHeight)
     panel.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
     panel.BorderSizePixel = 0
     panel.LayoutOrder = layoutOrder
@@ -464,159 +471,157 @@ local function createSettingsPanel(tabFrame, layoutOrder, onColorChange, valueNa
     panelCorner.CornerRadius = UDim.new(0, 3)
     panelCorner.Parent = panel
     
-    -- 1. Color Picker Row
-    local colorLabel = Instance.new("TextLabel")
-    colorLabel.Size = UDim2.new(0, 50, 0, 30)
-    colorLabel.Position = UDim2.new(0, 10, 0, 5)
-    colorLabel.BackgroundTransparency = 1
-    colorLabel.Text = "Color:"
-    colorLabel.TextColor3 = Color3.fromRGB(180, 180, 185)
-    colorLabel.TextSize = 12
-    colorLabel.Font = Enum.Font.SourceSansBold
-    colorLabel.TextXAlignment = Enum.TextXAlignment.Left
-    colorLabel.Parent = panel
+    local panelPadding = Instance.new("UIPadding")
+    panelPadding.PaddingTop = UDim.new(0, 5)
+    panelPadding.PaddingBottom = UDim.new(0, 5)
+    panelPadding.PaddingLeft = UDim.new(0, 10)
+    panelPadding.PaddingRight = UDim.new(0, 10)
+    panelPadding.Parent = panel
     
-    local colors = {
-        Color3.fromRGB(80, 80, 250),   -- Blue
-        Color3.fromRGB(250, 80, 80),   -- Red
-        Color3.fromRGB(80, 250, 80),   -- Green
-        Color3.fromRGB(250, 250, 80),  -- Yellow
-        Color3.fromRGB(255, 255, 255)  -- White
-    }
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Padding = UDim.new(0, 2)
+    listLayout.Parent = panel
     
-    local buttonsContainer = Instance.new("Frame")
-    buttonsContainer.Size = UDim2.new(1, -70, 0, 30)
-    buttonsContainer.Position = UDim2.new(0, 60, 0, 5)
-    buttonsContainer.BackgroundTransparency = 1
-    buttonsContainer.Parent = panel
+    local rVal = math.round(defaultColor.R * 255)
+    local gVal = math.round(defaultColor.G * 255)
+    local bVal = math.round(defaultColor.B * 255)
     
-    local gridLayout = Instance.new("UIListLayout")
-    gridLayout.FillDirection = Enum.FillDirection.Horizontal
-    gridLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-    gridLayout.Padding = UDim.new(0, 8)
-    gridLayout.Parent = buttonsContainer
+    local function updateColor()
+        local newColor = Color3.fromRGB(rVal, gVal, bVal)
+        onColorChange(newColor)
+    end
     
-    for _, color in ipairs(colors) do
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, 18, 0, 18)
-        btn.BackgroundColor3 = color
-        btn.Text = ""
-        btn.Parent = buttonsContainer
+    -- Helper to build a compact slider inside the panel
+    local function buildCompactSlider(sliderName, minVal, maxVal, defaultVal, fillIndex, onChange)
+        local sliderRow = Instance.new("Frame")
+        sliderRow.Size = UDim2.new(1, 0, 0, rowHeight)
+        sliderRow.BackgroundTransparency = 1
+        sliderRow.Parent = panel
         
-        local btnCorner = Instance.new("UICorner")
-        btnCorner.CornerRadius = UDim.new(1, 0)
-        btnCorner.Parent = btn
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(0, 90, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = sliderName .. ": " .. tostring(defaultVal)
+        label.TextColor3 = Color3.fromRGB(180, 180, 185)
+        label.TextSize = 11
+        label.Font = Enum.Font.SourceSansBold
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Parent = sliderRow
         
-        -- Border to indicate selected color
-        local stroke = Instance.new("UIStroke")
-        stroke.Thickness = 1.5
-        stroke.Color = Color3.fromRGB(35, 35, 40)
-        stroke.Parent = btn
+        local sliderBar = Instance.new("Frame")
+        sliderBar.Size = UDim2.new(1, -95, 0, 4)
+        sliderBar.Position = UDim2.new(0, 95, 0.5, -2)
+        sliderBar.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+        sliderBar.BorderSizePixel = 0
+        sliderBar.Parent = sliderRow
         
-        btn.MouseButton1Click:Connect(function()
-            onColorChange(color)
-            for _, child in ipairs(buttonsContainer:GetChildren()) do
-                if child:IsA("TextButton") then
-                    local s = child:FindFirstChild("UIStroke")
-                    if s then
-                        s.Color = (child == btn) and Color3.fromRGB(240, 240, 245) or Color3.fromRGB(35, 35, 40)
-                    end
-                end
+        local sliderBarCorner = Instance.new("UICorner")
+        sliderBarCorner.CornerRadius = UDim.new(0, 2)
+        sliderBarCorner.Parent = sliderBar
+        
+        local fillColor = Color3.fromRGB(80, 80, 250)
+        if fillIndex == 1 then
+            fillColor = Color3.fromRGB(220, 80, 80) -- Red
+        elseif fillIndex == 2 then
+            fillColor = Color3.fromRGB(80, 220, 80) -- Green
+        elseif fillIndex == 3 then
+            fillColor = Color3.fromRGB(80, 80, 220) -- Blue
+        end
+        
+        local sliderFill = Instance.new("Frame")
+        sliderFill.Size = UDim2.new(0, 0, 1, 0)
+        sliderFill.BackgroundColor3 = fillColor
+        sliderFill.BorderSizePixel = 0
+        sliderFill.Parent = sliderBar
+        
+        local sliderFillCorner = Instance.new("UICorner")
+        sliderFillCorner.CornerRadius = UDim.new(0, 2)
+        sliderFillCorner.Parent = sliderFill
+        
+        local sliderButton = Instance.new("Frame")
+        sliderButton.Size = UDim2.new(0, 10, 0, 10)
+        sliderButton.Position = UDim2.new(0, -5, 0.5, -5)
+        sliderButton.BackgroundColor3 = Color3.fromRGB(240, 240, 245)
+        sliderButton.BorderSizePixel = 0
+        sliderButton.Parent = sliderBar
+        
+        local sliderBtnCorner = Instance.new("UICorner")
+        sliderBtnCorner.CornerRadius = UDim.new(1, 0)
+        sliderBtnCorner.Parent = sliderButton
+        
+        local function updateVal(percentage)
+            percentage = math.clamp(percentage, 0, 1)
+            sliderFill.Size = UDim2.new(percentage, 0, 1, 0)
+            sliderButton.Position = UDim2.new(percentage, -5, 0.5, -5)
+            
+            local val
+            local range = maxVal - minVal
+            if range <= 1 then
+                val = math.round((minVal + range * percentage) * 100) / 100
+            elseif range <= 10 then
+                val = math.round((minVal + range * percentage) * 10) / 10
+            else
+                val = math.round(minVal + range * percentage)
             end
-        end)
-    end
-    
-    -- 2. Value Slider (Thickness/Size/Transparency)
-    local sliderLabel = Instance.new("TextLabel")
-    sliderLabel.Size = UDim2.new(0, 80, 0, 20)
-    sliderLabel.Position = UDim2.new(0, 10, 0, 45)
-    sliderLabel.BackgroundTransparency = 1
-    sliderLabel.Text = valueName .. ": " .. tostring(defaultVal)
-    sliderLabel.TextColor3 = Color3.fromRGB(180, 180, 185)
-    sliderLabel.TextSize = 12
-    sliderLabel.Font = Enum.Font.SourceSansBold
-    sliderLabel.TextXAlignment = Enum.TextXAlignment.Left
-    sliderLabel.Parent = panel
-    
-    local sliderBar = Instance.new("Frame")
-    sliderBar.Size = UDim2.new(1, -110, 0, 6)
-    sliderBar.Position = UDim2.new(0, 100, 0, 52)
-    sliderBar.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-    sliderBar.BorderSizePixel = 0
-    sliderBar.Parent = panel
-    
-    local sliderBarCorner = Instance.new("UICorner")
-    sliderBarCorner.CornerRadius = UDim.new(0, 3)
-    sliderBarCorner.Parent = sliderBar
-    
-    local sliderFill = Instance.new("Frame")
-    sliderFill.Size = UDim2.new(0, 0, 1, 0)
-    sliderFill.BackgroundColor3 = Color3.fromRGB(80, 80, 250)
-    sliderFill.BorderSizePixel = 0
-    sliderFill.Parent = sliderBar
-    
-    local sliderFillCorner = Instance.new("UICorner")
-    sliderFillCorner.CornerRadius = UDim.new(0, 3)
-    sliderFillCorner.Parent = sliderFill
-    
-    local sliderButton = Instance.new("Frame")
-    sliderButton.Size = UDim2.new(0, 12, 0, 12)
-    sliderButton.Position = UDim2.new(0, -6, 0.5, -6)
-    sliderButton.BackgroundColor3 = Color3.fromRGB(240, 240, 245)
-    sliderButton.BorderSizePixel = 0
-    sliderButton.Parent = sliderBar
-    
-    local sliderBtnCorner = Instance.new("UICorner")
-    sliderBtnCorner.CornerRadius = UDim.new(1, 0)
-    sliderBtnCorner.Parent = sliderButton
-    
-    local function updateSettingsSlider(percentage)
-        percentage = math.clamp(percentage, 0, 1)
-        sliderFill.Size = UDim2.new(percentage, 0, 1, 0)
-        sliderButton.Position = UDim2.new(percentage, -6, 0.5, -6)
-        
-        local val
-        if minVal == 0 and maxVal == 1 then
-            val = math.round((minVal + (maxVal - minVal) * percentage) * 10) / 10
-        else
-            val = math.round(minVal + (maxVal - minVal) * percentage)
+            
+            label.Text = sliderName .. ": " .. tostring(val)
+            onChange(val)
         end
         
-        sliderLabel.Text = valueName .. ": " .. tostring(val)
-        onValueChange(val)
+        local initialPercent = (defaultVal - minVal) / (maxVal - minVal)
+        updateVal(initialPercent)
+        
+        local active = false
+        
+        local function processInput(input)
+            local barSize = sliderBar.AbsoluteSize.X
+            local barPos = sliderBar.AbsolutePosition.X
+            local mousePos = input.Position.X
+            local percentage = (mousePos - barPos) / barSize
+            updateVal(percentage)
+        end
+        
+        table.insert(connections, sliderBar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                active = true
+                processInput(input)
+            end
+        end))
+        
+        table.insert(connections, UserInputService.InputChanged:Connect(function(input)
+            if active and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                processInput(input)
+            end
+        end))
+        
+        table.insert(connections, UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                active = false
+            end
+        end))
     end
     
-    local initialPercent = (defaultVal - minVal) / (maxVal - minVal)
-    updateSettingsSlider(initialPercent)
+    -- Add R, G, B sliders
+    buildCompactSlider("Red", 0, 255, rVal, 1, function(val)
+        rVal = val
+        updateColor()
+    end)
     
-    local active = false
+    buildCompactSlider("Green", 0, 255, gVal, 2, function(val)
+        gVal = val
+        updateColor()
+    end)
     
-    local function processInput(input)
-        local barSize = sliderBar.AbsoluteSize.X
-        local barPos = sliderBar.AbsolutePosition.X
-        local mousePos = input.Position.X
-        local percentage = (mousePos - barPos) / barSize
-        updateSettingsSlider(percentage)
+    buildCompactSlider("Blue", 0, 255, bVal, 3, function(val)
+        bVal = val
+        updateColor()
+    end)
+    
+    -- Add custom sliders
+    for _, sliderConf in ipairs(customSliders) do
+        buildCompactSlider(sliderConf.name, sliderConf.min, sliderConf.max, sliderConf.default, 4, sliderConf.onChange)
     end
-    
-    table.insert(connections, sliderBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            active = true
-            processInput(input)
-        end
-    end))
-    
-    table.insert(connections, UserInputService.InputChanged:Connect(function(input)
-        if active and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            processInput(input)
-        end
-    end))
-    
-    table.insert(connections, UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            active = false
-        end
-    end))
     
     return panel
 end
@@ -625,7 +630,7 @@ end
 local playerTab = createTab("Player", 1, 200)
 local worldTab = createTab("World", 2, 200)
 local authorsTab = createTab("Authors", 3, 520)
-local visualsTab = createTab("Visuals", 4, 600)
+local visualsTab = createTab("Visuals", 4, 850)
 
 -- DEFAULT TAB SETTINGS
 showTab("Player")
@@ -691,6 +696,12 @@ local function updateCharacterVisuals(targetPlayer, char)
         highlight.OutlineColor = borderColor
         highlight.FillTransparency = highlightEnabled and highlightTransparency or 1
         highlight.OutlineTransparency = bordersEnabled and borderTransparency or 1
+        
+        -- If Highlighting is enabled, but borders is disabled, we still want to show outline with highlightOutlineTransparency
+        if highlightEnabled and not bordersEnabled then
+            highlight.OutlineTransparency = highlightOutlineTransparency
+            highlight.OutlineColor = highlightColor
+        end
     else
         if highlight then
             highlight:Destroy()
@@ -727,6 +738,7 @@ local function updateCharacterVisuals(targetPlayer, char)
                 if stroke then
                     stroke.Color = boxColor
                     stroke.Thickness = boxThickness
+                    stroke.Transparency = boxTransparency
                 end
             end
             
@@ -758,10 +770,14 @@ local function updateCharacterVisuals(targetPlayer, char)
                 nameLabel.Size = UDim2.new(1, 0, 1, 0)
                 nameLabel.BackgroundTransparency = 1
                 nameLabel.Font = Enum.Font.SourceSansBold
-                nameLabel.TextStrokeTransparency = 0
-                nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                nameLabel.TextStrokeTransparency = 1 -- Disable default stroke
                 nameLabel.TextWrapped = true
                 nameLabel.Parent = billboard
+                
+                local stroke = Instance.new("UIStroke")
+                stroke.Color = Color3.fromRGB(0, 0, 0)
+                stroke.Thickness = nameStrokeThickness
+                stroke.Parent = nameLabel
             end
             
             local nameLabel = billboard:FindFirstChild("TextLabel")
@@ -769,6 +785,11 @@ local function updateCharacterVisuals(targetPlayer, char)
                 nameLabel.Text = targetPlayer.DisplayName or targetPlayer.Name
                 nameLabel.TextColor3 = nameColor
                 nameLabel.TextSize = nameSize
+                
+                local stroke = nameLabel:FindFirstChild("UIStroke")
+                if stroke then
+                    stroke.Thickness = nameStrokeThickness
+                end
             end
             
             billboard.Parent = head
@@ -861,7 +882,7 @@ local creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v1.4.4\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v1.4.5\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.Font = Enum.Font.SourceSansBold
@@ -890,7 +911,7 @@ local changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v1.4.4:\n- Made entire row click-to-toggle (LMB) and click-to-configure (RMB).\n- Fixed right-click (MouseButton2) Settings Panel activation issues."
+changelogLabel.Text = "Changelog v1.4.5:\n- Added detailed RGB color sliders (Red/Green/Blue) for all Visuals functions.\n- Added highly precise decimal sliders for transparency, outline transparency, font size, and stroke thickness.\n- Increased canvas scrolling size to prevent UI overlaps."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.Font = Enum.Font.SourceSans
@@ -938,13 +959,31 @@ end, function()
     end
 end)
 
-highlightSettingsPanel = createSettingsPanel(visualsTab, 2, function(color)
+highlightSettingsPanel = createSettingsPanel(visualsTab, 2, highlightColor, function(color)
     highlightColor = color
     refreshAllVisuals()
-end, "Transparency", 0.1, 0.9, highlightTransparency, function(val)
-    highlightTransparency = val
-    refreshAllVisuals()
-end)
+end, {
+    {
+        name = "Fill Trans",
+        min = 0,
+        max = 1,
+        default = highlightTransparency,
+        onChange = function(val)
+            highlightTransparency = val
+            refreshAllVisuals()
+        end
+    },
+    {
+        name = "Outline Trans",
+        min = 0,
+        max = 1,
+        default = highlightOutlineTransparency,
+        onChange = function(val)
+            highlightOutlineTransparency = val
+            refreshAllVisuals()
+        end
+    }
+})
 
 local borderSettingsPanel
 local borderRow = createToggle(visualsTab, "Enable Borders", false, 3, function(state)
@@ -956,13 +995,21 @@ end, function()
     end
 end)
 
-borderSettingsPanel = createSettingsPanel(visualsTab, 4, function(color)
+borderSettingsPanel = createSettingsPanel(visualsTab, 4, borderColor, function(color)
     borderColor = color
     refreshAllVisuals()
-end, "Transparency", 0, 0.9, borderTransparency, function(val)
-    borderTransparency = val
-    refreshAllVisuals()
-end)
+end, {
+    {
+        name = "Outline Trans",
+        min = 0,
+        max = 1,
+        default = borderTransparency,
+        onChange = function(val)
+            borderTransparency = val
+            refreshAllVisuals()
+        end
+    }
+})
 
 local nameSettingsPanel
 local nameRow = createToggle(visualsTab, "Show Names", false, 5, function(state)
@@ -974,13 +1021,31 @@ end, function()
     end
 end)
 
-nameSettingsPanel = createSettingsPanel(visualsTab, 6, function(color)
+nameSettingsPanel = createSettingsPanel(visualsTab, 6, nameColor, function(color)
     nameColor = color
     refreshAllVisuals()
-end, "Font Size", 10, 24, nameSize, function(val)
-    nameSize = val
-    refreshAllVisuals()
-end)
+end, {
+    {
+        name = "Font Size",
+        min = 10,
+        max = 24,
+        default = nameSize,
+        onChange = function(val)
+            nameSize = val
+            refreshAllVisuals()
+        end
+    },
+    {
+        name = "Stroke Thick",
+        min = 0,
+        max = 4,
+        default = nameStrokeThickness,
+        onChange = function(val)
+            nameStrokeThickness = val
+            refreshAllVisuals()
+        end
+    }
+})
 
 local boxSettingsPanel
 local boxRow = createToggle(visualsTab, "Show Boxes", false, 7, function(state)
@@ -992,13 +1057,31 @@ end, function()
     end
 end)
 
-boxSettingsPanel = createSettingsPanel(visualsTab, 8, function(color)
+boxSettingsPanel = createSettingsPanel(visualsTab, 8, boxColor, function(color)
     boxColor = color
     refreshAllVisuals()
-end, "Thickness", 1, 5, boxThickness, function(val)
-    boxThickness = val
-    refreshAllVisuals()
-end)
+end, {
+    {
+        name = "Thickness",
+        min = 1,
+        max = 5,
+        default = boxThickness,
+        onChange = function(val)
+            boxThickness = val
+            refreshAllVisuals()
+        end
+    },
+    {
+        name = "Transparency",
+        min = 0,
+        max = 1,
+        default = boxTransparency,
+        onChange = function(val)
+            boxTransparency = val
+            refreshAllVisuals()
+        end
+    }
+})
 
 
 -- ==================== TOP STATS ISLAND ====================

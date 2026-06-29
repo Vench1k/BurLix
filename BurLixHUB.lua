@@ -163,7 +163,7 @@ titleText.Name = "TitleText"
 titleText.Size = UDim2.new(1, -60, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "BurLix HUB v1.4.8"
+titleText.Text = "BurLix HUB v1.4.9"
 titleText.TextColor3 = Color3.fromRGB(240, 240, 245)
 titleText.TextSize = 18
 titleText.Font = Enum.Font.SourceSansBold
@@ -178,6 +178,30 @@ titleSeparator.Position = UDim2.new(0, 0, 0, 44)
 titleSeparator.BackgroundColor3 = Color3.fromRGB(55, 55, 60)
 titleSeparator.BorderSizePixel = 0
 titleSeparator.Parent = titleBar
+
+-- Settings Button (⚙) to open menu settings
+local settingsButton = Instance.new("TextButton")
+settingsButton.Name = "SettingsButton"
+settingsButton.Size = UDim2.new(0, 24, 0, 24)
+settingsButton.Position = UDim2.new(1, -64, 0.5, -12)
+settingsButton.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+settingsButton.Text = "⚙"
+settingsButton.TextColor3 = Color3.fromRGB(240, 240, 245)
+settingsButton.TextSize = 14
+settingsButton.Font = Enum.Font.SourceSansBold
+settingsButton.Parent = titleBar
+
+local settingsCorner = Instance.new("UICorner")
+settingsCorner.CornerRadius = UDim.new(0, 3)
+settingsCorner.Parent = settingsButton
+
+-- Settings Button Hover Styles
+settingsButton.MouseEnter:Connect(function()
+    TweenService:Create(settingsButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(70, 70, 75)}):Play()
+end)
+settingsButton.MouseLeave:Connect(function()
+    TweenService:Create(settingsButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 50, 55)}):Play()
+end)
 
 -- Close Button (X) to completely close the script
 local closeButton = Instance.new("TextButton")
@@ -194,6 +218,48 @@ closeButton.Parent = titleBar
 local closeCorner = Instance.new("UICorner")
 closeCorner.CornerRadius = UDim.new(0, 3)
 closeCorner.Parent = closeButton
+
+-- Settings Popup Frame (Overlays ContentContainer)
+local settingsPopup = Instance.new("Frame")
+settingsPopup.Name = "SettingsPopup"
+settingsPopup.Size = UDim2.new(1, -110, 1, -45)
+settingsPopup.Position = UDim2.new(0, 110, 0, 45)
+settingsPopup.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+settingsPopup.BorderSizePixel = 0
+settingsPopup.Visible = false
+settingsPopup.Parent = mainFrame
+
+local popupCorner = Instance.new("UICorner")
+popupCorner.CornerRadius = UDim.new(0, 4)
+popupCorner.Parent = settingsPopup
+
+local popupTitle = Instance.new("TextLabel")
+popupTitle.Size = UDim2.new(1, -20, 0, 30)
+popupTitle.Position = UDim2.new(0, 15, 0, 10)
+popupTitle.BackgroundTransparency = 1
+popupTitle.Text = "Menu & Island Settings"
+popupTitle.TextColor3 = Color3.fromRGB(240, 240, 245)
+popupTitle.TextSize = 16
+popupTitle.Font = Enum.Font.SourceSansBold
+popupTitle.TextXAlignment = Enum.TextXAlignment.Left
+popupTitle.Parent = settingsPopup
+
+local popupContent = Instance.new("TextLabel")
+popupContent.Size = UDim2.new(1, -30, 1, -50)
+popupContent.Position = UDim2.new(0, 15, 0, 45)
+popupContent.BackgroundTransparency = 1
+popupContent.Text = "Settings are currently empty."
+popupContent.TextColor3 = Color3.fromRGB(150, 150, 155)
+popupContent.TextSize = 13
+popupContent.Font = Enum.Font.SourceSans
+popupContent.TextXAlignment = Enum.TextXAlignment.Left
+popupContent.TextYAlignment = Enum.TextYAlignment.Top
+popupContent.Parent = settingsPopup
+
+-- Toggle visibility on settingsButton click
+settingsButton.MouseButton1Click:Connect(function()
+    settingsPopup.Visible = not settingsPopup.Visible
+end)
 
 -- Close Button Hover/Click Styles
 closeButton.MouseEnter:Connect(function()
@@ -241,6 +307,9 @@ contentContainer.Parent = mainFrame
 local tabs = {}
 
 local function showTab(tabName)
+    if settingsPopup then
+        settingsPopup.Visible = false
+    end
     for name, data in pairs(tabs) do
         if name == tabName then
             TweenService:Create(data.Button, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
@@ -619,7 +688,7 @@ local function createSettingsPanel(tabFrame, layoutOrder, defaultColor, onColorC
     local presetsLayout = Instance.new("UIListLayout")
     presetsLayout.FillDirection = Enum.FillDirection.Horizontal
     presetsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-    presetsLayout.Padding = UDim.new(0, 6)
+    presetsLayout.Padding = UDim.new(0, 4)
     presetsLayout.Parent = presetsContainer
     
     local presets = {
@@ -629,7 +698,12 @@ local function createSettingsPanel(tabFrame, layoutOrder, defaultColor, onColorC
         Color3.fromRGB(250, 250, 80),  -- Yellow
         Color3.fromRGB(255, 255, 255), -- White
         Color3.fromRGB(250, 80, 250),  -- Purple
-        Color3.fromRGB(250, 150, 50)   -- Orange
+        Color3.fromRGB(250, 150, 50),  -- Orange
+        Color3.fromRGB(80, 250, 250),  -- Cyan
+        Color3.fromRGB(250, 120, 170), -- Pink
+        Color3.fromRGB(150, 250, 80),  -- Lime
+        Color3.fromRGB(0, 0, 0),       -- Black
+        Color3.fromRGB(150, 150, 150)  -- Grey
     }
     
     local function selectColor(color, skipHexUpdate)
@@ -651,7 +725,7 @@ local function createSettingsPanel(tabFrame, layoutOrder, defaultColor, onColorC
     
     for _, color in ipairs(presets) do
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, 14, 0, 14)
+        btn.Size = UDim2.new(0, 12, 0, 12)
         btn.BackgroundColor3 = color
         btn.Text = ""
         btn.Parent = presetsContainer
@@ -1058,7 +1132,7 @@ local creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v1.4.8\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v1.4.9\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.Font = Enum.Font.SourceSansBold
@@ -1087,7 +1161,7 @@ local changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v1.4.8:\n- Fixed critical font error (Enum.Font.SourceSansCode -> Enum.Font.Code) causing initialization crashes.\n- Restored missing top stats island, Visuals tab elements, and Close Button functionality."
+changelogLabel.Text = "Changelog v1.4.9:\n- Expanded quick color presets palette to 12 popular color options.\n- Added a new Settings Button (⚙) in the title bar that opens a menu and island settings panel."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.Font = Enum.Font.SourceSans

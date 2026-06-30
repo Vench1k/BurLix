@@ -90,7 +90,6 @@ end
 
 -- Fallback Settings
 local currentWalkSpeed = 16
--- Checkbox configuration to determine Jump mode vs standard configurations
 local isJumpPower = true
 local currentJumpValue = 50
 local minJump = 0
@@ -126,7 +125,7 @@ local fontFamilies = {
     },
     Roboto = {
         Regular = Enum.Font.Roboto,
-        Bold = Enum.Font.RobotoBold
+        Bold = Enum.Font.Roboto
     },
     Gotham = {
         Regular = Enum.Font.Gotham,
@@ -754,6 +753,7 @@ local function createTab(name, layoutOrder, canvasHeight)
     btn.Text = name
     btn.TextColor3 = Color3.fromRGB(220, 220, 225)
     btn.TextSize = 13
+    btn.Font = Enum.Font.SourceSansBold
     btn.LayoutOrder = layoutOrder
     btn.Parent = navPanel
 
@@ -823,7 +823,7 @@ local function createRow(tabFrame, name, height, layoutOrder)
 
     local rowCorner = Instance.new("UICorner")
     rowCorner.CornerRadius = UDim.new(0, 3)
-    rowCorner.Parent = row
+rowCorner.Parent = row
 
     registerThemeElement(row, "Card")
 

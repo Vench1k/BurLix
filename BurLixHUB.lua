@@ -117,6 +117,11 @@ local menuContainer = nil
 local islandScale = nil
 
 local tabs = {}
+local tabIcons = {
+    Player = "rbxassetid://10747373176",  -- Человечек (User)
+    World = "rbxassetid://10734947948",   -- Глобус (Globe)
+    Visuals = "rbxassetid://10734950309"  -- Глаз (Eye)
+}
 
 -- Font Families Setup
 local currentFontFamily = "SourceSans"
@@ -344,9 +349,18 @@ local function updateTabColors()
         local targetTextColor = (name == activeTabName) and colors.Accent or colors.Text
         pcall(function()
             TweenService:Create(data.Button, tweenInfo, {
-                BackgroundColor3 = targetBgColor,
-                TextColor3 = targetTextColor
+                BackgroundColor3 = targetBgColor
             }):Play()
+            if data.TextLabel then
+                TweenService:Create(data.TextLabel, tweenInfo, {
+                    TextColor3 = targetTextColor
+                }):Play()
+            end
+            if data.Icon then
+                TweenService:Create(data.Icon, tweenInfo, {
+                    ImageColor3 = targetTextColor
+                }):Play()
+            end
         end)
     end
     if settingsButton then
@@ -608,7 +622,7 @@ titleText.Name = "TitleText"
 titleText.Size = UDim2.new(1, -60, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "BurLix HUB v1.8.1"
+titleText.Text = "BurLix HUB v1.8.2"
 titleText.TextColor3 = Color3.fromRGB(240, 240, 245)
 titleText.TextSize = 18
 titleText.TextXAlignment = Enum.TextXAlignment.Left
@@ -732,6 +746,9 @@ profileButton.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 profileButton.BorderSizePixel = 0
 profileButton.Text = ""
 profileButton.AutoButtonColor = false
+profileButton.Active = true
+profileButton.Selectable = true
+profileButton.ZIndex = 5
 profileButton.Parent = navPanel
 registerThemeElement(profileButton, "Card")
 
@@ -752,6 +769,9 @@ avatarImage.Position = UDim2.new(0, 8, 0.5, -17)
 avatarImage.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 avatarImage.BorderSizePixel = 0
 avatarImage.Image = "rbxassetid://0"
+avatarImage.Active = false
+avatarImage.Selectable = false
+avatarImage.ZIndex = 6
 avatarImage.Parent = profileButton
 
 local avatarCorner = Instance.new("UICorner")
@@ -779,6 +799,9 @@ usernameLabel.TextColor3 = Color3.fromRGB(240, 240, 245)
 usernameLabel.TextSize = 11
 usernameLabel.TextXAlignment = Enum.TextXAlignment.Left
 usernameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+usernameLabel.Active = false
+usernameLabel.Selectable = false
+usernameLabel.ZIndex = 6
 usernameLabel.Parent = profileButton
 registerThemeElement(usernameLabel, "Text")
 registerFontElement(usernameLabel, "Bold")
@@ -794,6 +817,9 @@ idLabel.TextColor3 = Color3.fromRGB(150, 150, 155)
 idLabel.TextSize = 9
 idLabel.TextXAlignment = Enum.TextXAlignment.Left
 idLabel.TextTruncate = Enum.TextTruncate.AtEnd
+idLabel.Active = false
+idLabel.Selectable = false
+idLabel.ZIndex = 6
 idLabel.Parent = profileButton
 registerThemeElement(idLabel, "Text")
 registerFontElement(idLabel, "Regular")
@@ -859,16 +885,49 @@ local function createTab(name, layoutOrder, canvasHeight)
     btn.Visible = not isHidden
     btn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
     btn.BorderSizePixel = 0
-    btn.Text = name
-    btn.TextColor3 = Color3.fromRGB(220, 220, 225)
-    btn.TextSize = 13
-    btn.Font = Enum.Font.SourceSansBold
-    btn.LayoutOrder = layoutOrder
+    btn.Text = "" -- Empty text, custom layout inside
+    btn.AutoButtonColor = false
     btn.Parent = navButtonsFrame
 
     local btnCorner = Instance.new("UICorner")
     btnCorner.CornerRadius = UDim.new(0, 3)
     btnCorner.Parent = btn
+
+    local icon = nil
+    local label = nil
+
+    if not isHidden then
+        -- Icon Label
+        local iconId = tabIcons[name]
+        if iconId then
+            icon = Instance.new("ImageLabel")
+            icon.Name = "Icon"
+            icon.Size = UDim2.new(0, 16, 0, 16)
+            icon.Position = UDim2.new(0, 8, 0.5, -8)
+            icon.BackgroundTransparency = 1
+            icon.Image = iconId
+            icon.ImageColor3 = Color3.fromRGB(220, 220, 225)
+            icon.Active = false
+            icon.Selectable = false
+            icon.Parent = btn
+        end
+
+        -- Text Label
+        label = Instance.new("TextLabel")
+        label.Name = "Label"
+        label.Size = UDim2.new(1, icon and -32 or -16, 1, 0)
+        label.Position = UDim2.new(0, icon and 28 or 8, 0, 0)
+        label.BackgroundTransparency = 1
+        label.Text = name
+        label.TextColor3 = Color3.fromRGB(220, 220, 225)
+        label.TextSize = 13
+        label.Font = Enum.Font.SourceSansBold
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Active = false
+        label.Selectable = false
+        label.Parent = btn
+        registerFontElement(label, "Bold")
+    end
 
     -- Hover effect for tab button (only if visible)
     if not isHidden then
@@ -909,13 +968,11 @@ local function createTab(name, layoutOrder, canvasHeight)
     listLayout.SortOrder = Enum.SortOrder.LayoutOrder
     listLayout.Parent = frame
 
-    tabs[name] = {Button = btn, Frame = frame}
+    tabs[name] = {Button = btn, Frame = frame, Icon = icon, TextLabel = label}
 
     btn.MouseButton1Click:Connect(function()
         showTab(name)
     end)
-
-    registerFontElement(btn, "Bold")
 
     return frame
 end
@@ -1948,7 +2005,7 @@ local creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v1.8.1\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v1.8.2\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -1979,7 +2036,7 @@ local changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v1.8.1:\n- Fixed tab theme updating lag (colors now update instantly on theme switch).\n- Replaced standard Authors tab button with a user profile card in the left-bottom corner.\n- Added Avatar, DisplayName, and UserId to the profile card.\n- Tied profile card click to open Authors tab."
+changelogLabel.Text = "Changelog v1.8.2:\n- Fixed user profile card click-through issues (Active = false on children).\n- Added minimalist icons to Player (User), World (Globe) and Visuals (Eye) sidebar tabs.\n- Configured tab icons to dynamically tween colors under themes."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.TextXAlignment = Enum.TextXAlignment.Left

@@ -116,6 +116,8 @@ local mainScale = nil
 local menuContainer = nil
 local islandScale = nil
 
+local tabs = {}
+
 -- Font Families Setup
 local currentFontFamily = "SourceSans"
 local fontFamilies = {
@@ -606,7 +608,7 @@ titleText.Name = "TitleText"
 titleText.Size = UDim2.new(1, -60, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "BurLix HUB v1.8.0"
+titleText.Text = "BurLix HUB v1.8.1"
 titleText.TextColor3 = Color3.fromRGB(240, 240, 245)
 titleText.TextSize = 18
 titleText.TextXAlignment = Enum.TextXAlignment.Left
@@ -690,7 +692,7 @@ end)
 -- Navigation Panel (Sidebar)
 local navPanel = Instance.new("Frame")
 navPanel.Name = "NavigationPanel"
-navPanel.Size = UDim2.new(0, 110, 1, -45)
+navPanel.Size = UDim2.new(0, 120, 1, -45)
 navPanel.Position = UDim2.new(0, 0, 0, 45)
 navPanel.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 navPanel.BorderSizePixel = 0
@@ -701,32 +703,138 @@ local navCorner = Instance.new("UICorner")
 navCorner.CornerRadius = UDim.new(0, 4)
 navCorner.Parent = navPanel
 
+-- Container for navigation buttons to separate them from the profile card
+local navButtonsFrame = Instance.new("Frame")
+navButtonsFrame.Name = "NavButtonsFrame"
+navButtonsFrame.Size = UDim2.new(1, 0, 1, -65)
+navButtonsFrame.BackgroundTransparency = 1
+navButtonsFrame.BorderSizePixel = 0
+navButtonsFrame.Parent = navPanel
+
 -- Left list layout for navigation buttons
 local navList = Instance.new("UIListLayout")
 navList.Padding = UDim.new(0, 8)
 navList.SortOrder = Enum.SortOrder.LayoutOrder
-navList.Parent = navPanel
+navList.Parent = navButtonsFrame
 
 local navPadding = Instance.new("UIPadding")
 navPadding.PaddingTop = UDim.new(0, 10)
 navPadding.PaddingLeft = UDim.new(0, 8)
 navPadding.PaddingRight = UDim.new(0, 8)
-navPadding.Parent = navPanel
+navPadding.Parent = navButtonsFrame
+
+-- User Profile Card (Left bottom corner)
+local profileButton = Instance.new("TextButton")
+profileButton.Name = "UserProfileCard"
+profileButton.Size = UDim2.new(1, -16, 0, 50)
+profileButton.Position = UDim2.new(0, 8, 1, -58)
+profileButton.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+profileButton.BorderSizePixel = 0
+profileButton.Text = ""
+profileButton.AutoButtonColor = false
+profileButton.Parent = navPanel
+registerThemeElement(profileButton, "Card")
+
+local profileCorner = Instance.new("UICorner")
+profileCorner.CornerRadius = UDim.new(0, 4)
+profileCorner.Parent = profileButton
+
+local profileStroke = Instance.new("UIStroke")
+profileStroke.Thickness = 1
+profileStroke.Color = Color3.fromRGB(50, 50, 55)
+profileStroke.Parent = profileButton
+
+-- Avatar image using Players:GetUserThumbnailAsync
+local avatarImage = Instance.new("ImageLabel")
+avatarImage.Name = "AvatarImage"
+avatarImage.Size = UDim2.new(0, 34, 0, 34)
+avatarImage.Position = UDim2.new(0, 8, 0.5, -17)
+avatarImage.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+avatarImage.BorderSizePixel = 0
+avatarImage.Image = "rbxassetid://0"
+avatarImage.Parent = profileButton
+
+local avatarCorner = Instance.new("UICorner")
+avatarCorner.CornerRadius = UDim.new(1, 0)
+avatarCorner.Parent = avatarImage
+
+task.spawn(function()
+    local avatarImageId = "rbxassetid://0"
+    pcall(function()
+        local thumbnailType = Enum.ThumbnailType.HeadShot
+        local thumbnailSize = Enum.ThumbnailSize.Size48x48
+        avatarImageId = Players:GetUserThumbnailAsync(player.UserId, thumbnailType, thumbnailSize)
+    end)
+    avatarImage.Image = avatarImageId
+end)
+
+-- Username Label
+local usernameLabel = Instance.new("TextLabel")
+usernameLabel.Name = "UsernameLabel"
+usernameLabel.Size = UDim2.new(1, -54, 0, 16)
+usernameLabel.Position = UDim2.new(0, 48, 0, 8)
+usernameLabel.BackgroundTransparency = 1
+usernameLabel.Text = player.DisplayName or player.Name or "User"
+usernameLabel.TextColor3 = Color3.fromRGB(240, 240, 245)
+usernameLabel.TextSize = 11
+usernameLabel.TextXAlignment = Enum.TextXAlignment.Left
+usernameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+usernameLabel.Parent = profileButton
+registerThemeElement(usernameLabel, "Text")
+registerFontElement(usernameLabel, "Bold")
+
+-- ID Label
+local idLabel = Instance.new("TextLabel")
+idLabel.Name = "IdLabel"
+idLabel.Size = UDim2.new(1, -54, 0, 12)
+idLabel.Position = UDim2.new(0, 48, 0, 24)
+idLabel.BackgroundTransparency = 1
+idLabel.Text = "@" .. tostring(player.UserId or 0)
+idLabel.TextColor3 = Color3.fromRGB(150, 150, 155)
+idLabel.TextSize = 9
+idLabel.TextXAlignment = Enum.TextXAlignment.Left
+idLabel.TextTruncate = Enum.TextTruncate.AtEnd
+idLabel.Parent = profileButton
+registerThemeElement(idLabel, "Text")
+registerFontElement(idLabel, "Regular")
+
+-- Profile Card Hover Animation
+table.insert(connections, profileButton.MouseEnter:Connect(function()
+    local colors = themes[currentTheme]
+    if colors then
+        local hoverColor = Color3.fromRGB(
+            math.clamp(colors.Card.R * 255 + 10, 0, 255),
+            math.clamp(colors.Card.G * 255 + 10, 0, 255),
+            math.clamp(colors.Card.B * 255 + 10, 0, 255)
+        )
+        TweenService:Create(profileButton, TweenInfo.new(0.2), {BackgroundColor3 = hoverColor}):Play()
+    end
+end))
+
+table.insert(connections, profileButton.MouseLeave:Connect(function()
+    local colors = themes[currentTheme]
+    if colors then
+        TweenService:Create(profileButton, TweenInfo.new(0.2), {BackgroundColor3 = colors.Card}):Play()
+    end
+end))
+
+table.insert(connections, profileButton.MouseButton1Click:Connect(function()
+    showTab("Authors")
+end))
 
 -- Content Container Panel (Right side)
 local contentContainer = Instance.new("Frame")
 contentContainer.Name = "ContentContainer"
-contentContainer.Size = UDim2.new(1, -110, 1, -45)
-contentContainer.Position = UDim2.new(0, 110, 0, 45)
+contentContainer.Size = UDim2.new(1, -120, 1, -45)
+contentContainer.Position = UDim2.new(0, 120, 0, 45)
 contentContainer.BackgroundTransparency = 1
 contentContainer.BorderSizePixel = 0
 contentContainer.Parent = menuContainer
 
 -- Tab system logic
-local tabs = {}
 
 local function showTab(tabName)
-    if tabName ~= "Settings" then
+    if tabName ~= "Settings" and tabName ~= "Authors" then
         lastActiveTab = tabName
     end
     activeTabName = tabName
@@ -746,8 +854,9 @@ local function createTab(name, layoutOrder, canvasHeight)
     -- Navigation Button
     local btn = Instance.new("TextButton")
     btn.Name = name .. "TabButton"
-    btn.Size = name == "Settings" and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 32)
-    btn.Visible = name ~= "Settings"
+    local isHidden = (name == "Settings" or name == "Authors")
+    btn.Size = isHidden and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 32)
+    btn.Visible = not isHidden
     btn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
     btn.BorderSizePixel = 0
     btn.Text = name
@@ -755,14 +864,14 @@ local function createTab(name, layoutOrder, canvasHeight)
     btn.TextSize = 13
     btn.Font = Enum.Font.SourceSansBold
     btn.LayoutOrder = layoutOrder
-    btn.Parent = navPanel
+    btn.Parent = navButtonsFrame
 
     local btnCorner = Instance.new("UICorner")
     btnCorner.CornerRadius = UDim.new(0, 3)
     btnCorner.Parent = btn
 
     -- Hover effect for tab button (only if visible)
-    if name ~= "Settings" then
+    if not isHidden then
         btn.MouseEnter:Connect(function()
             local colors = themes[currentTheme]
             if colors and activeTabName ~= name then
@@ -1839,7 +1948,7 @@ local creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v1.8.0\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v1.8.1\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -1870,7 +1979,7 @@ local changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v1.8.0:\n- Fixed UI Scale to scale only contents, leaving frame borders and resize grip intact.\n- Removed menu resize limits, allowing stretching up to full screen.\n- Added Island Scale slider in settings to adjust stats island size.\n- Added Font Selection: SourceSans, Roboto, Gotham, Code, Ubuntu.\n- Added 4 new visual themes: Midnight, Emerald, Nebula, Monochrome.\n- Fixed tab selection theme reset issue."
+changelogLabel.Text = "Changelog v1.8.1:\n- Fixed tab theme updating lag (colors now update instantly on theme switch).\n- Replaced standard Authors tab button with a user profile card in the left-bottom corner.\n- Added Avatar, DisplayName, and UserId to the profile card.\n- Tied profile card click to open Authors tab."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.TextXAlignment = Enum.TextXAlignment.Left

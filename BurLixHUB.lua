@@ -119,7 +119,7 @@ local tabs = {}
 -- Sidebar tab icons as Roblox image asset IDs
 local tabIcons = {
     Player  = "rbxassetid://10747373176",  -- User/Person icon
-    World   = "rbxassetid://4483345998",   -- Globe icon
+    World   = "rbxassetid://6034684900",   -- Planet icon
     Visuals = "rbxassetid://10734950309"   -- Eye icon
 }
 
@@ -429,6 +429,7 @@ mainFrame.Name = "MainFrame"
 mainFrame.Size = UDim2.new(0, 600, 0, 420)
 mainFrame.Position = UDim2.new(0.5, -300, 0.5, -210)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+mainFrame.BackgroundTransparency = 0.12
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 mainFrame.Draggable = false
@@ -620,6 +621,7 @@ local titleBar = Instance.new("Frame")
 titleBar.Name = "TitleBar"
 titleBar.Size = UDim2.new(1, 0, 0, 45)
 titleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+titleBar.BackgroundTransparency = 0.12
 titleBar.BorderSizePixel = 0
 titleBar.Parent = menuContainer
 registerThemeElement(titleBar, "Header")
@@ -634,7 +636,7 @@ titleText.Name = "TitleText"
 titleText.Size = UDim2.new(1, -60, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "BurLix HUB v1.8.5"
+titleText.Text = "BurLix HUB v1.8.6"
 titleText.TextColor3 = Color3.fromRGB(240, 240, 245)
 titleText.TextSize = 18
 titleText.TextXAlignment = Enum.TextXAlignment.Left
@@ -721,6 +723,7 @@ navPanel.Name = "NavigationPanel"
 navPanel.Size = UDim2.new(0, 120, 1, -45)
 navPanel.Position = UDim2.new(0, 0, 0, 45)
 navPanel.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+navPanel.BackgroundTransparency = 0.12
 navPanel.BorderSizePixel = 0
 navPanel.Parent = menuContainer
 registerThemeElement(navPanel, "Sidebar")
@@ -1530,7 +1533,7 @@ local playerTab = createTab("Player", 1, 200)
 local worldTab = createTab("World", 2, 200)
 local authorsTab = createTab("Authors", 3, 520)
 local visualsTab = createTab("Visuals", 4, 850)
-local settingsTab = createTab("Settings", 5, 350)
+local settingsTab = createTab("Settings", 5, 650)
 
 -- Settings Tab Content
 local settingsTitle = Instance.new("TextLabel")

@@ -112,6 +112,7 @@ local resizing = false
 local resizeDragInput = nil
 local resizeStartPos = nil
 local resizeStartSize = nil
+local mainScale = nil
 
 -- Visuals State variables
 local highlightEnabled = false
@@ -247,16 +248,15 @@ end
 local function updateTabColors()
     local colors = themes[currentTheme]
     if not colors then return end
+    local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     for name, data in pairs(tabs) do
-        if name == activeTabName then
-            data.Button.BackgroundColor3 = colors.Card
-        else
-            data.Button.BackgroundColor3 = colors.Sidebar
-        end
+        local targetColor = (name == activeTabName) and colors.Card or colors.Sidebar
+        pcall(function() TweenService:Create(data.Button, tweenInfo, {BackgroundColor3 = targetColor}):Play() end)
         data.Button.TextColor3 = colors.Text
     end
     if settingsButton then
-        settingsButton.BackgroundColor3 = activeTabName == "Settings" and colors.Accent or colors.Header
+        local targetSettingsColor = (activeTabName == "Settings") and colors.Accent or colors.Header
+        pcall(function() TweenService:Create(settingsButton, tweenInfo, {BackgroundColor3 = targetSettingsColor}):Play() end)
     end
 end
 
@@ -265,23 +265,31 @@ local function applyTheme(themeName)
     local colors = themes[themeName]
     if not colors then return end
     
+    local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    
     for _, elem in ipairs(themeElements.Background) do
-        pcall(function() elem.BackgroundColor3 = colors.Background end)
+        pcall(function() TweenService:Create(elem, tweenInfo, {BackgroundColor3 = colors.Background}):Play() end)
     end
     for _, elem in ipairs(themeElements.Header) do
-        pcall(function() elem.BackgroundColor3 = colors.Header end)
+        pcall(function() TweenService:Create(elem, tweenInfo, {BackgroundColor3 = colors.Header}):Play() end)
     end
     for _, elem in ipairs(themeElements.Accent) do
-        pcall(function() elem.BackgroundColor3 = colors.Accent end)
+        pcall(function()
+            if elem:IsA("TextLabel") or elem:IsA("TextBox") or elem:IsA("TextButton") then
+                TweenService:Create(elem, tweenInfo, {TextColor3 = colors.Accent}):Play()
+            else
+                TweenService:Create(elem, tweenInfo, {BackgroundColor3 = colors.Accent}):Play()
+            end
+        end)
     end
     for _, elem in ipairs(themeElements.Sidebar) do
-        pcall(function() elem.BackgroundColor3 = colors.Sidebar end)
+        pcall(function() TweenService:Create(elem, tweenInfo, {BackgroundColor3 = colors.Sidebar}):Play() end)
     end
     for _, elem in ipairs(themeElements.Card) do
-        pcall(function() elem.BackgroundColor3 = colors.Card end)
+        pcall(function() TweenService:Create(elem, tweenInfo, {BackgroundColor3 = colors.Card}):Play() end)
     end
     for _, elem in ipairs(themeElements.Text) do
-        pcall(function() elem.TextColor3 = colors.Text end)
+        pcall(function() TweenService:Create(elem, tweenInfo, {TextColor3 = colors.Text}):Play() end)
     end
     
     for _, updater in ipairs(toggleUpdaters) do
@@ -308,6 +316,10 @@ mainFrame.Active = true
 mainFrame.Draggable = false
 mainFrame.Parent = screenGui
 registerThemeElement(mainFrame, "Background")
+
+mainScale = Instance.new("UIScale")
+mainScale.Scale = 1.0
+mainScale.Parent = mainFrame
 
 -- UI Corner for Main Frame (Less rounded)
 local mainCorner = Instance.new("UICorner")
@@ -481,7 +493,7 @@ titleText.Name = "TitleText"
 titleText.Size = UDim2.new(1, -60, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "BurLix HUB v1.7.0"
+titleText.Text = "BurLix HUB v1.7.1"
 titleText.TextColor3 = Color3.fromRGB(240, 240, 245)
 titleText.TextSize = 18
 titleText.Font = Enum.Font.SourceSansBold
@@ -641,7 +653,7 @@ local function createTab(name, layoutOrder, canvasHeight)
     if name ~= "Settings" then
         btn.MouseEnter:Connect(function()
             local colors = themes[currentTheme]
-            if colors and btn.BackgroundColor3 ~= colors.Card then
+            if colors and activeTabName ~= name then
                 local hoverColor = Color3.fromRGB(
                     math.clamp(colors.Sidebar.R * 255 + 10, 0, 255),
                     math.clamp(colors.Sidebar.G * 255 + 10, 0, 255),
@@ -652,7 +664,7 @@ local function createTab(name, layoutOrder, canvasHeight)
         end)
         btn.MouseLeave:Connect(function()
             local colors = themes[currentTheme]
-            if colors and btn.BackgroundColor3 ~= colors.Card then
+            if colors and activeTabName ~= name then
                 TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = colors.Sidebar}):Play()
             end
         end)
@@ -707,14 +719,15 @@ local function createRow(tabFrame, name, height, layoutOrder)
 end
 
 -- Helper Function to Create Sliders
-local function createSlider(tabFrame, name, minVal, maxVal, defaultVal, layoutOrder, onChange)
+local function createSlider(tabFrame, name, minVal, maxVal, defaultVal, layoutOrder, onChange, suffix)
+    suffix = suffix or ""
     local row = createRow(tabFrame, name .. "Row", 70, layoutOrder)
     
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, -20, 0, 25)
     label.Position = UDim2.new(0, 10, 0, 5)
     label.BackgroundTransparency = 1
-    label.Text = name .. ": " .. tostring(defaultVal)
+    label.Text = name .. ": " .. tostring(defaultVal) .. suffix
     label.TextColor3 = Color3.fromRGB(220, 220, 225)
     label.TextSize = 14
     label.Font = Enum.Font.SourceSansBold
@@ -759,7 +772,7 @@ local function createSlider(tabFrame, name, minVal, maxVal, defaultVal, layoutOr
         sliderButton.Position = UDim2.new(percentage, -8, 0.5, -8)
         
         local val = math.round(minVal + (maxVal - minVal) * percentage)
-        label.Text = name .. ": " .. tostring(val)
+        label.Text = name .. ": " .. tostring(val) .. suffix
         onChange(val)
     end
     
@@ -850,7 +863,6 @@ local function createToggle(tabFrame, name, defaultVal, layoutOrder, onChange, o
     
     local knobCorner = Instance.new("UICorner")
     knobCorner.CornerRadius = UDim.new(1, 0)
-    knobKnobCorner = knobCorner -- local copy
     knobCorner.Parent = knob
     
     local enabled = defaultVal
@@ -1320,11 +1332,11 @@ table.insert(connections, keybindInput.FocusLost:Connect(function(enterPressed)
 end))
 
 -- Theme Selector Row
-local themeRow = createRow(settingsTab, "ThemeRow", 45, 5)
+local themeRow = createRow(settingsTab, "ThemeRow", 80, 5)
 
 local themeLabel = Instance.new("TextLabel")
-themeLabel.Size = UDim2.new(1, -280, 1, 0)
-themeLabel.Position = UDim2.new(0, 10, 0, 0)
+themeLabel.Size = UDim2.new(1, -20, 0, 20)
+themeLabel.Position = UDim2.new(0, 10, 0, 6)
 themeLabel.BackgroundTransparency = 1
 themeLabel.Text = "Menu Theme"
 themeLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
@@ -1334,32 +1346,28 @@ themeLabel.TextXAlignment = Enum.TextXAlignment.Left
 themeLabel.Parent = themeRow
 registerThemeElement(themeLabel, "Text")
 
-local themeContainer = Instance.new("ScrollingFrame")
-themeContainer.Size = UDim2.new(0, 260, 0, 28)
-themeContainer.Position = UDim2.new(1, -270, 0.5, -14)
+local themeContainer = Instance.new("Frame")
+themeContainer.Size = UDim2.new(1, -20, 1, -34)
+themeContainer.Position = UDim2.new(0, 10, 0, 28)
 themeContainer.BackgroundTransparency = 1
 themeContainer.BorderSizePixel = 0
-themeContainer.ScrollBarThickness = 2
-themeContainer.ScrollBarImageColor3 = Color3.fromRGB(120, 120, 130)
-themeContainer.CanvasSize = UDim2.new(0, 8 * 52 + 10, 0, 0)
-themeContainer.ScrollingDirection = Enum.ScrollingDirection.X
 themeContainer.Parent = themeRow
 
-local themeLayout = Instance.new("UIListLayout")
-themeLayout.FillDirection = Enum.FillDirection.Horizontal
-themeLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-themeLayout.Padding = UDim.new(0, 4)
+local themeLayout = Instance.new("UIGridLayout")
+themeLayout.CellSize = UDim2.new(0, 52, 0, 20)
+themeLayout.CellPadding = UDim2.new(0, 4, 0, 4)
+themeLayout.SortOrder = Enum.SortOrder.LayoutOrder
 themeLayout.Parent = themeContainer
 
 local themeNames = {"Dark", "Purple", "Aqua", "Sakura", "Cyberpunk", "Forest", "Nordic", "Sunset"}
-for _, name in ipairs(themeNames) do
+for idx, name in ipairs(themeNames) do
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 48, 0, 20)
     btn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
     btn.Text = name
     btn.TextColor3 = Color3.fromRGB(220, 220, 225)
-    btn.TextSize = 9
+    btn.TextSize = 10
     btn.Font = Enum.Font.SourceSansBold
+    btn.LayoutOrder = idx
     btn.Parent = themeContainer
     
     local btnCorner = Instance.new("UICorner")
@@ -1385,6 +1393,13 @@ for _, name in ipairs(themeNames) do
     
     updateBtnStyle()
 end
+
+-- UI Scale Slider
+local scaleSliderRow, updateScaleSlider = createSlider(settingsTab, "UI Scale", 50, 150, 100, 6, function(val)
+    if mainScale then
+        mainScale.Scale = val / 100
+    end
+end, "%")
 
 -- DEFAULT TAB SETTINGS
 showTab("Player")
@@ -1636,7 +1651,7 @@ local creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v1.7.0\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v1.7.1\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.Font = Enum.Font.SourceSansBold
@@ -1667,7 +1682,7 @@ local changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v1.7.0:\n- Added dynamic menu resizing by dragging the bottom-right corner.\n- Added 4 new beautiful themes (Cyberpunk, Forest, Nordic, Sunset).\n- Redesigned the theme selection row with a horizontal scrollbar."
+changelogLabel.Text = "Changelog v1.7.1:\n- Added UI Scale slider in settings tab to scale menu contents.\n- Replaced horizontal scrollbar for themes with an adaptive grid (no scrolling needed).\n- Fixed theme colors not updating sidebar buttons instantly on change."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.Font = Enum.Font.SourceSans

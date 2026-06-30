@@ -116,11 +116,11 @@ local islandScale = nil
 local islandToggle = nil
 
 local tabs = {}
--- Text-based icons for sidebar tabs — rendered as TextLabels, guaranteed to display
-local tabIconText = {
-    Player = "\xE2\x97\x8F",   -- filled circle (person)
-    World  = "\xE2\x97\x8B",  -- open circle (globe)
-    Visuals = "\xE2\x97\x86" -- filled diamond (eye)
+-- Sidebar tab icons as Roblox image asset IDs
+local tabIcons = {
+    Player  = "rbxassetid://10747373176",  -- User/Person icon
+    World   = "rbxassetid://4483345998",   -- Globe icon
+    Visuals = "rbxassetid://10734950309"   -- Eye icon
 }
 
 -- Font Families Setup
@@ -357,10 +357,10 @@ local function updateTabColors()
                 }):Play()
             end
             if data.Icon then
-                -- Icon is now a TextLabel, use TextColor3
+                -- Icon is an ImageLabel, tween ImageColor3
                 pcall(function()
                     TweenService:Create(data.Icon, tweenInfo, {
-                        TextColor3 = targetTextColor
+                        ImageColor3 = targetTextColor
                     }):Play()
                 end)
             end
@@ -582,6 +582,15 @@ registerThemeElement(islandSeparator, "Header")
 islandFPS = createIslandLabel("FPS: --", 50, 3)
 islandPing = createIslandLabel("Ping: --", 60, 4)
 
+-- Flexible spacer to push the toggle button to the right
+local islandSpacer = Instance.new("Frame")
+islandSpacer.Name = "Spacer"
+islandSpacer.Size = UDim2.new(1, -236, 1, 0)  -- fills remaining horizontal space
+islandSpacer.BackgroundTransparency = 1
+islandSpacer.BorderSizePixel = 0
+islandSpacer.LayoutOrder = 5
+islandSpacer.Parent = islandFrame
+
 -- Set initial visibility from state
 islandFrame.Visible = islandVisible
 islandFPS.Visible = fpsVisible
@@ -594,7 +603,7 @@ islandToggle.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 islandToggle.Text = mainFrame.Visible and "∧" or "∨"
 islandToggle.TextColor3 = Color3.fromRGB(240, 240, 245)
 islandToggle.TextSize = 14
-islandToggle.LayoutOrder = 5
+islandToggle.LayoutOrder = 6
 islandToggle.Parent = islandFrame
 registerFontElement(islandToggle, "Bold")
 registerThemeElement(islandToggle, "Card")
@@ -625,7 +634,7 @@ titleText.Name = "TitleText"
 titleText.Size = UDim2.new(1, -60, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "BurLix HUB v1.8.4"
+titleText.Text = "BurLix HUB v1.8.5"
 titleText.TextColor3 = Color3.fromRGB(240, 240, 245)
 titleText.TextSize = 18
 titleText.TextXAlignment = Enum.TextXAlignment.Left
@@ -910,18 +919,17 @@ local function createTab(name, layoutOrder, canvasHeight)
     local label = nil
 
     if not isHidden then
-        -- Text-based icon (guaranteed cross-platform display)
-        local iconChar = tabIconText and tabIconText[name]
-        if iconChar then
-            icon = Instance.new("TextLabel")
+        -- ImageLabel icon
+        local iconId = tabIcons[name]
+        if iconId then
+            icon = Instance.new("ImageLabel")
             icon.Name = "Icon"
-            icon.Size = UDim2.new(0, 18, 1, 0)
+            icon.Size = UDim2.new(0, 16, 0, 16)
+            icon.Position = UDim2.new(0, 8, 0.5, -8)
             icon.BackgroundTransparency = 1
-            icon.Text = iconChar
-            icon.TextColor3 = Color3.fromRGB(220, 220, 225)
-            icon.TextSize = 14
-            icon.Font = Enum.Font.SourceSansBold
-            icon.TextXAlignment = Enum.TextXAlignment.Center
+            icon.Image = iconId
+            icon.ImageColor3 = Color3.fromRGB(220, 220, 225)
+            icon.ScaleType = Enum.ScaleType.Fit
             icon.Active = false
             icon.Selectable = false
             icon.Parent = btn
@@ -930,8 +938,8 @@ local function createTab(name, layoutOrder, canvasHeight)
         -- Text Label
         label = Instance.new("TextLabel")
         label.Name = "Label"
-        label.Size = UDim2.new(1, icon and -26 or -12, 1, 0)
-        label.Position = UDim2.new(0, icon and 24 or 8, 0, 0)
+        label.Size = UDim2.new(1, icon and -30 or -12, 1, 0)
+        label.Position = UDim2.new(0, icon and 28 or 8, 0, 0)
         label.BackgroundTransparency = 1
         label.Text = name
         label.TextColor3 = Color3.fromRGB(220, 220, 225)

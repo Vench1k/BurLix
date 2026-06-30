@@ -112,14 +112,13 @@ local resizing = false
 local resizeDragInput = nil
 local resizeStartPos = nil
 local resizeStartSize = nil
-local mainScale = nil
-local menuContainer = nil
 local islandScale = nil
+local islandToggle = nil
 
 local tabs = {}
 local tabIcons = {
     Player = "rbxassetid://10747373176",  -- Человечек (User)
-    World = "rbxassetid://10734947948",   -- Глобус (Globe)
+    World = "rbxassetid://10723395995",   -- Глобус (Globe)
     Visuals = "rbxassetid://10734950309"  -- Глаз (Eye)
 }
 
@@ -510,6 +509,9 @@ end))
 
 local function toggleUI()
     mainFrame.Visible = not mainFrame.Visible
+    if islandToggle then
+        islandToggle.Text = mainFrame.Visible and "▲" or "▼"
+    end
 end
 
 -- ==================== TOP STATS ISLAND ====================
@@ -517,7 +519,7 @@ end
 islandFrame = Instance.new("Frame")
 islandFrame.Name = "IslandFrame"
 islandFrame.AnchorPoint = Vector2.new(0.5, 0)
-islandFrame.Size = UDim2.new(0, 380, 0, 35)
+islandFrame.Size = UDim2.new(0, 250, 0, 35)
 islandFrame.Position = UDim2.new(0.5, 0, 0, 15)
 islandFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 islandFrame.BorderSizePixel = 0
@@ -573,25 +575,22 @@ islandSeparator.LayoutOrder = 2
 islandSeparator.Parent = islandFrame
 registerThemeElement(islandSeparator, "Header")
 
-local islandUser = createIslandLabel(player.DisplayName or player.Name or "Player", 80, 3)
-islandUser.TextTruncate = Enum.TextTruncate.AtEnd
-
-islandFPS = createIslandLabel("FPS: --", 50, 4)
-islandPing = createIslandLabel("Ping: --", 60, 5)
+islandFPS = createIslandLabel("FPS: --", 50, 3)
+islandPing = createIslandLabel("Ping: --", 60, 4)
 
 -- Set initial visibility from state
 islandFrame.Visible = islandVisible
 islandFPS.Visible = fpsVisible
 islandPing.Visible = pingVisible
 
--- Toggle Button on Island
-local islandToggle = Instance.new("TextButton")
-islandToggle.Size = UDim2.new(0, 60, 0, 25)
+-- Toggle Button on Island (Square arrow toggle)
+islandToggle = Instance.new("TextButton")
+islandToggle.Size = UDim2.new(0, 25, 0, 25)
 islandToggle.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
-islandToggle.Text = "Toggle"
+islandToggle.Text = mainFrame.Visible and "▲" or "▼"
 islandToggle.TextColor3 = Color3.fromRGB(240, 240, 245)
-islandToggle.TextSize = 11
-islandToggle.LayoutOrder = 6
+islandToggle.TextSize = 12
+islandToggle.LayoutOrder = 5
 islandToggle.Parent = islandFrame
 registerFontElement(islandToggle, "Bold")
 registerThemeElement(islandToggle, "Card")
@@ -622,7 +621,7 @@ titleText.Name = "TitleText"
 titleText.Size = UDim2.new(1, -60, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "BurLix HUB v1.8.2"
+titleText.Text = "BurLix HUB v1.8.3"
 titleText.TextColor3 = Color3.fromRGB(240, 240, 245)
 titleText.TextSize = 18
 titleText.TextXAlignment = Enum.TextXAlignment.Left
@@ -738,28 +737,24 @@ navPadding.PaddingRight = UDim.new(0, 8)
 navPadding.Parent = navButtonsFrame
 
 -- User Profile Card (Left bottom corner)
-local profileButton = Instance.new("TextButton")
-profileButton.Name = "UserProfileCard"
-profileButton.Size = UDim2.new(1, -16, 0, 50)
-profileButton.Position = UDim2.new(0, 8, 1, -58)
-profileButton.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
-profileButton.BorderSizePixel = 0
-profileButton.Text = ""
-profileButton.AutoButtonColor = false
-profileButton.Active = true
-profileButton.Selectable = true
-profileButton.ZIndex = 5
-profileButton.Parent = navPanel
-registerThemeElement(profileButton, "Card")
+local profileCard = Instance.new("Frame")
+profileCard.Name = "UserProfileCard"
+profileCard.Size = UDim2.new(1, -16, 0, 50)
+profileCard.Position = UDim2.new(0, 8, 1, -58)
+profileCard.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+profileCard.BorderSizePixel = 0
+profileCard.ZIndex = 5
+profileCard.Parent = navPanel
+registerThemeElement(profileCard, "Card")
 
 local profileCorner = Instance.new("UICorner")
 profileCorner.CornerRadius = UDim.new(0, 4)
-profileCorner.Parent = profileButton
+profileCorner.Parent = profileCard
 
 local profileStroke = Instance.new("UIStroke")
 profileStroke.Thickness = 1
 profileStroke.Color = Color3.fromRGB(50, 50, 55)
-profileStroke.Parent = profileButton
+profileStroke.Parent = profileCard
 
 -- Avatar image using Players:GetUserThumbnailAsync
 local avatarImage = Instance.new("ImageLabel")
@@ -772,7 +767,7 @@ avatarImage.Image = "rbxassetid://0"
 avatarImage.Active = false
 avatarImage.Selectable = false
 avatarImage.ZIndex = 6
-avatarImage.Parent = profileButton
+avatarImage.Parent = profileCard
 
 local avatarCorner = Instance.new("UICorner")
 avatarCorner.CornerRadius = UDim.new(1, 0)
@@ -802,7 +797,7 @@ usernameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 usernameLabel.Active = false
 usernameLabel.Selectable = false
 usernameLabel.ZIndex = 6
-usernameLabel.Parent = profileButton
+usernameLabel.Parent = profileCard
 registerThemeElement(usernameLabel, "Text")
 registerFontElement(usernameLabel, "Bold")
 
@@ -820,12 +815,23 @@ idLabel.TextTruncate = Enum.TextTruncate.AtEnd
 idLabel.Active = false
 idLabel.Selectable = false
 idLabel.ZIndex = 6
-idLabel.Parent = profileButton
+idLabel.Parent = profileCard
 registerThemeElement(idLabel, "Text")
 registerFontElement(idLabel, "Regular")
 
--- Profile Card Hover Animation
-table.insert(connections, profileButton.MouseEnter:Connect(function()
+-- Invisible overlay button for 100% reliable click detection
+local profileClickButton = Instance.new("TextButton")
+profileClickButton.Name = "ProfileClickButton"
+profileClickButton.Size = UDim2.new(1, 0, 1, 0)
+profileClickButton.BackgroundTransparency = 1
+profileClickButton.Text = ""
+profileClickButton.Active = true
+profileClickButton.Selectable = true
+profileClickButton.ZIndex = 10
+profileClickButton.Parent = profileCard
+
+-- Profile Card Hover Animation (triggered by overlay button hover)
+table.insert(connections, profileClickButton.MouseEnter:Connect(function()
     local colors = themes[currentTheme]
     if colors then
         local hoverColor = Color3.fromRGB(
@@ -833,18 +839,18 @@ table.insert(connections, profileButton.MouseEnter:Connect(function()
             math.clamp(colors.Card.G * 255 + 10, 0, 255),
             math.clamp(colors.Card.B * 255 + 10, 0, 255)
         )
-        TweenService:Create(profileButton, TweenInfo.new(0.2), {BackgroundColor3 = hoverColor}):Play()
+        TweenService:Create(profileCard, TweenInfo.new(0.2), {BackgroundColor3 = hoverColor}):Play()
     end
 end))
 
-table.insert(connections, profileButton.MouseLeave:Connect(function()
+table.insert(connections, profileClickButton.MouseLeave:Connect(function()
     local colors = themes[currentTheme]
     if colors then
-        TweenService:Create(profileButton, TweenInfo.new(0.2), {BackgroundColor3 = colors.Card}):Play()
+        TweenService:Create(profileCard, TweenInfo.new(0.2), {BackgroundColor3 = colors.Card}):Play()
     end
 end))
 
-table.insert(connections, profileButton.MouseButton1Click:Connect(function()
+table.insert(connections, profileClickButton.MouseButton1Click:Connect(function()
     showTab("Authors")
 end))
 
@@ -2005,7 +2011,7 @@ local creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v1.8.2\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v1.8.3\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -2036,7 +2042,7 @@ local changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v1.8.2:\n- Fixed user profile card click-through issues (Active = false on children).\n- Added minimalist icons to Player (User), World (Globe) and Visuals (Eye) sidebar tabs.\n- Configured tab icons to dynamically tween colors under themes."
+changelogLabel.Text = "Changelog v1.8.3:\n- Fixed profile card navigation: replaced TextButton layout with Frame + Invisible Overlay Button to guarantee click-through detection.\n- Fixed World tab icon to a fully validated Lucide globe asset.\n- Redesigned Top Stats Island: removed player nickname, set width to 250px, and replaced text Toggle with an arrow state indicator (▲ / ▼)."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.TextXAlignment = Enum.TextXAlignment.Left

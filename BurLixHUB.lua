@@ -404,7 +404,7 @@ local themes = {
     Light = {
         Background = Color3.fromRGB(240, 240, 245),
         Header = Color3.fromRGB(220, 220, 225),
-        Accent = Color3.fromRGB(80, 80, 250),
+        Accent = Color3.fromRGB(241, 205, 225),
         Sidebar = Color3.fromRGB(230, 230, 235),
         Card = Color3.fromRGB(255, 255, 255),
         Text = Color3.fromRGB(40, 40, 45)
@@ -452,7 +452,7 @@ local function registerThemeElement(element, category)
             end
         elseif category == "Accent" then
             if element:IsA("TextLabel") or element:IsA("TextBox") or element:IsA("TextButton") then
-                element.TextColor3 = colors.Accent
+                element.TextColor3 = (currentTheme == "Light") and Color3.fromRGB(138, 58, 92) or colors.Accent
             elseif element:IsA("UIStroke") then
                 element.Color = colors.Accent
             else
@@ -472,7 +472,7 @@ local function updateTabColors()
     local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     for name, data in pairs(tabs) do
         local targetBgColor = (name == activeTabName) and colors.Card or colors.Sidebar
-        local targetTextColor = (name == activeTabName) and colors.Accent or colors.Text
+        local targetTextColor = (name == activeTabName) and ((currentTheme == "Light") and Color3.fromRGB(138, 58, 92) or colors.Accent) or colors.Text
         pcall(function()
             TweenService:Create(data.Button, tweenInfo, {
                 BackgroundColor3 = targetBgColor
@@ -495,7 +495,7 @@ local function updateTabColors()
     if settingsButton then
         local targetSettingsBgColor = (activeTabName == "Settings") and colors.Accent or colors.Header
         local isAccentLight = (colors.Accent.R * 0.299 + colors.Accent.G * 0.587 + colors.Accent.B * 0.114) > 0.7
-        local targetSettingsTextColor = (activeTabName == "Settings") and (isAccentLight and Color3.fromRGB(30, 30, 35) or Color3.fromRGB(255, 255, 255)) or colors.Text
+        local targetSettingsTextColor = (activeTabName == "Settings") and (isAccentLight and (currentTheme == "Light" and Color3.fromRGB(138, 58, 92) or Color3.fromRGB(30, 30, 35)) or Color3.fromRGB(255, 255, 255)) or colors.Text
         pcall(function()
             TweenService:Create(settingsButton, tweenInfo, {
                 BackgroundColor3 = targetSettingsBgColor

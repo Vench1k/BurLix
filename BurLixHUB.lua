@@ -3249,14 +3249,18 @@ table.insert(connections, RunService.RenderStepped:Connect(function()
                 deepDarkMascot.Size = isLight and UDim2.new(0, 85, 0, 140) or UDim2.new(0, 140, 0, 140)
                 local mainPos = mainFrame.AbsolutePosition
                 -- Align bottom-left of mascot to top-left of mainFrame with a small overlap (legs hanging over titleBar)
-                deepDarkMascot.Position = UDim2.new(0, mainPos.X + 10, 0, mainPos.Y + 38)
+                local offsetX = isLight and 15 or 10
+                local offsetY = isLight and 44 or 38
+                deepDarkMascot.Position = UDim2.new(0, mainPos.X + offsetX, 0, mainPos.Y + offsetY)
                 deepDarkMascot.ImageTransparency = mainFrame.GroupTransparency
                 wasMainVisible = true
             elseif islandFrame and islandFrame.Visible then
                 deepDarkMascot.Size = isLight and UDim2.new(0, 24, 0, 40) or UDim2.new(0, 40, 0, 40)
                 local islandPos = islandFrame.AbsolutePosition
                 -- Align bottom-left of mascot to top-left of islandFrame with a small overlap (legs hanging over island)
-                deepDarkMascot.Position = UDim2.new(0, islandPos.X - 4, 0, islandPos.Y + 14)
+                local offsetX = isLight and 0 or -4
+                local offsetY = isLight and 18 or 14
+                deepDarkMascot.Position = UDim2.new(0, islandPos.X + offsetX, 0, islandPos.Y + offsetY)
                 
                 -- Smoothly fade in on the island when the menu finishes closing
                 if wasMainVisible then

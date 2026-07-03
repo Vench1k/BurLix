@@ -572,11 +572,9 @@ local function applyTheme(themeName)
     end
     
     if titleText then
-        local isDeepDark = (themeName == "DeepDark")
         local tweenInfoFast = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        -- Since the mascot is now even bigger (140x140), starts at X = 10, right edge is at X = 150.
-        -- We shift the title text to X = 150 for DeepDark to prevent overlap, and back to X = 15 for other themes.
-        local targetX = isDeepDark and 150 or 15
+        -- Shift titleText to prevent overlap with mascot: X=150 for DeepDark (width 140), X=95 for Light (width 85), X=15 for others
+        local targetX = (themeName == "DeepDark" and 150) or (themeName == "Light" and 95) or 15
         pcall(function()
             TweenService:Create(titleText, tweenInfoFast, {
                 Position = UDim2.new(0, targetX, 0, 0)
@@ -3243,18 +3241,19 @@ table.insert(connections, RunService.RenderStepped:Connect(function()
     -- Sync DeepDark sitting mascot position, size and transparency
     if deepDarkMascot then
         if currentTheme == "DeepDark" or currentTheme == "Light" then
+            local isLight = (currentTheme == "Light")
             if mainFrame.Visible then
-                deepDarkMascot.Size = UDim2.new(0, 140, 0, 140)
+                deepDarkMascot.Size = isLight and UDim2.new(0, 85, 0, 140) or UDim2.new(0, 140, 0, 140)
                 local mainPos = mainFrame.AbsolutePosition
                 -- Align bottom-left of mascot to top-left of mainFrame with a small overlap (legs hanging over titleBar)
-                deepDarkMascot.Position = UDim2.new(0, mainPos.X + 10, 0, mainPos.Y + 28)
+                deepDarkMascot.Position = UDim2.new(0, mainPos.X + 10, 0, mainPos.Y + 38)
                 deepDarkMascot.ImageTransparency = mainFrame.GroupTransparency
                 wasMainVisible = true
             elseif islandFrame and islandFrame.Visible then
-                deepDarkMascot.Size = UDim2.new(0, 40, 0, 40)
+                deepDarkMascot.Size = isLight and UDim2.new(0, 24, 0, 40) or UDim2.new(0, 40, 0, 40)
                 local islandPos = islandFrame.AbsolutePosition
                 -- Align bottom-left of mascot to top-left of islandFrame with a small overlap (legs hanging over island)
-                deepDarkMascot.Position = UDim2.new(0, islandPos.X - 4, 0, islandPos.Y + 8)
+                deepDarkMascot.Position = UDim2.new(0, islandPos.X - 4, 0, islandPos.Y + 14)
                 
                 -- Smoothly fade in on the island when the menu finishes closing
                 if wasMainVisible then

@@ -402,10 +402,10 @@ local themes = {
         Text = Color3.fromRGB(240, 240, 240)
     },
     Light = {
-        Background = Color3.fromRGB(240, 240, 245),
-        Header = Color3.fromRGB(220, 220, 225),
+        Background = Color3.fromRGB(243, 242, 240),
+        Header = Color3.fromRGB(223, 222, 220),
         Accent = Color3.fromRGB(241, 205, 225),
-        Sidebar = Color3.fromRGB(230, 230, 235),
+        Sidebar = Color3.fromRGB(233, 232, 230),
         Card = Color3.fromRGB(255, 255, 255),
         Text = Color3.fromRGB(40, 40, 45)
     },

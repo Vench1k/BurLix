@@ -176,6 +176,11 @@ local deepDarkLogo = nil
 local deepDarkMascot = nil
 local wasMainVisible = false
 local titleText = nil
+local mainFrame = nil
+local currentTheme = "Dark"
+local isThemeTransitioning = false
+local mascotInitialized = false
+local mascotLayoutTheme = "Dark"
 
 -- Tab and Settings State variables
 local lastActiveTab = "Player"
@@ -194,6 +199,52 @@ local resizeStartPos = nil
 local resizeStartSize = nil
 local islandScale = nil
 local islandToggle = nil
+
+local function syncMascotPositionAndSize()
+    if not deepDarkMascot then return end
+    if mascotLayoutTheme == "DeepDark" or mascotLayoutTheme == "Light" then
+        local isLight = (mascotLayoutTheme == "Light")
+        if mainFrame and mainFrame.Visible then
+            deepDarkMascot.Size = isLight and UDim2.new(0, 85, 0, 140) or UDim2.new(0, 140, 0, 140)
+            local mainPos = mainFrame.AbsolutePosition
+            local offsetX = isLight and 15 or 10
+            local offsetY = isLight and 44 or 38
+            deepDarkMascot.Position = UDim2.new(0, mainPos.X + offsetX, 0, mainPos.Y + offsetY)
+            if not isThemeTransitioning then
+                deepDarkMascot.ImageTransparency = mainFrame.GroupTransparency
+            end
+            wasMainVisible = true
+        elseif islandFrame and islandFrame.Visible then
+            deepDarkMascot.Size = isLight and UDim2.new(0, 28, 0, 46) or UDim2.new(0, 46, 0, 46)
+            local islandPos = islandFrame.AbsolutePosition
+            local offsetX = isLight and 0 or -6
+            local offsetY = isLight and 15 or 14
+            deepDarkMascot.Position = UDim2.new(0, islandPos.X + offsetX, 0, islandPos.Y + offsetY)
+            
+            if not isThemeTransitioning then
+                if wasMainVisible then
+                    wasMainVisible = false
+                    deepDarkMascot.ImageTransparency = 1
+                    TweenService:Create(deepDarkMascot, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                        ImageTransparency = 0
+                    }):Play()
+                end
+            end
+        else
+            deepDarkMascot.Position = UDim2.new(0, -500, 0, -500)
+            if not isThemeTransitioning then
+                deepDarkMascot.ImageTransparency = 1
+            end
+            wasMainVisible = false
+        end
+    else
+        deepDarkMascot.Position = UDim2.new(0, -500, 0, -500)
+        if not isThemeTransitioning then
+            deepDarkMascot.ImageTransparency = 1
+        end
+        wasMainVisible = false
+    end
+end
 
 local tabs = {}
 -- Sidebar tab icons as Roblox image asset IDs
@@ -303,7 +354,7 @@ local boxTransparency = 0
 local connections = {}
 
 -- Themes Configuration
-local currentTheme = "Dark"
+currentTheme = "Dark"
 local themes = {
     Dark = {
         Background = Color3.fromRGB(30, 30, 35),
@@ -512,6 +563,7 @@ local function updateTabColors()
 end
 
 local function applyTheme(themeName)
+    local themeChanged = (currentTheme ~= themeName)
     currentTheme = themeName
     local colors = themes[themeName]
     if not colors then return end
@@ -519,11 +571,88 @@ local function applyTheme(themeName)
     local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     
     if deepDarkMascot then
-        if themeName == "DeepDark" then
-            deepDarkMascot.Image = "rbxthumb://type=Asset&id=3116499937&w=420&h=420"
-        elseif themeName == "Light" then
-            pcall(function()
-                deepDarkMascot.Image = getLightMascotAsset()
+        if themeChanged or not mascotInitialized then
+            mascotInitialized = true
+            task.spawn(function()
+                isThemeTransitioning = true
+                
+                local targetImage = nil
+                if themeName == "DeepDark" then
+                    targetImage = "rbxthumb://type=Asset&id=3116499937&w=420&h=420"
+                elseif themeName == "Light" then
+                    targetImage = getLightMascotAsset()
+                end
+                
+                local isCurrentlyVisible = (deepDarkMascot.Position.X.Offset > -100) and (deepDarkMascot.ImageTransparency < 1)
+                
+                if targetImage then
+                    if isCurrentlyVisible then
+                        -- Fade out existing mascot
+                        local fadeOut = TweenService:Create(deepDarkMascot, TweenInfo.new(0.12, Enum.EasingStyle.Quad), {ImageTransparency = 1})
+                        fadeOut:Play()
+                        fadeOut.Completed:Wait()
+                        
+                        -- Hide and clear to prevent stretching artifact
+                        deepDarkMascot.Visible = false
+                        deepDarkMascot.Image = ""
+                        task.wait()
+                        
+                        -- Update mascot layout state to the new theme after fade-out
+                        mascotLayoutTheme = themeName
+                        pcall(syncMascotPositionAndSize)
+                        
+                        -- Swap image and preload new asset
+                        deepDarkMascot.Image = targetImage
+                        pcall(function()
+                            game:GetService("ContentProvider"):PreloadAsync({deepDarkMascot})
+                        end)
+                        
+                        deepDarkMascot.Visible = true
+                        
+                        -- Fade in new mascot
+                        local targetTransparency = (mainFrame and mainFrame.Visible) and mainFrame.GroupTransparency or 0
+                        local fadeIn = TweenService:Create(deepDarkMascot, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {ImageTransparency = targetTransparency})
+                        fadeIn:Play()
+                        fadeIn.Completed:Wait()
+                    else
+                        -- Mascot was hidden, clear image and position first
+                        deepDarkMascot.Visible = false
+                        deepDarkMascot.Image = ""
+                        
+                        -- Set layout theme instantly since mascot is hidden
+                        mascotLayoutTheme = themeName
+                        pcall(syncMascotPositionAndSize)
+                        deepDarkMascot.ImageTransparency = 1
+                        task.wait()
+                        
+                        deepDarkMascot.Image = targetImage
+                        pcall(function()
+                            game:GetService("ContentProvider"):PreloadAsync({deepDarkMascot})
+                        end)
+                        
+                        deepDarkMascot.Visible = true
+                        
+                        local targetTransparency = (mainFrame and mainFrame.Visible) and mainFrame.GroupTransparency or 0
+                        local fadeIn = TweenService:Create(deepDarkMascot, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {ImageTransparency = targetTransparency})
+                        fadeIn:Play()
+                        fadeIn.Completed:Wait()
+                    end
+                else
+                    -- Mascot should be hidden
+                    if isCurrentlyVisible then
+                        local fadeOut = TweenService:Create(deepDarkMascot, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {ImageTransparency = 1})
+                        fadeOut:Play()
+                        fadeOut.Completed:Wait()
+                    end
+                    deepDarkMascot.Visible = false
+                    deepDarkMascot.Image = ""
+                    
+                    -- Update layout theme to hidden state
+                    mascotLayoutTheme = themeName
+                    pcall(syncMascotPositionAndSize)
+                end
+                
+                isThemeTransitioning = false
             end)
         end
     end
@@ -605,7 +734,7 @@ deepDarkMascot.Position = UDim2.new(0, -500, 0, -500) -- Start off-screen
 deepDarkMascot.Parent = screenGui
 
 -- Main Frame (Wider to accommodate left tab sidebar)
-local mainFrame = Instance.new("CanvasGroup")
+mainFrame = Instance.new("CanvasGroup")
 mainFrame.Name = "MainFrame"
 mainFrame.Size = UDim2.new(0, 600, 0, 420)
 mainFrame.Position = UDim2.new(0.5, -300, 0.5, -210)
@@ -3221,6 +3350,18 @@ table.insert(connections, UserInputService.InputChanged:Connect(function(input)
     end
 end))
 
+-- Eliminate dragging lag for the mascot by updating its position instantly when frames move
+if mainFrame then
+    table.insert(connections, mainFrame:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
+        pcall(syncMascotPositionAndSize)
+    end))
+end
+if islandFrame then
+    table.insert(connections, islandFrame:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
+        pcall(syncMascotPositionAndSize)
+    end))
+end
+
 -- FPS and Ping Tracking Logic (Using high performance os.clock() instead of tick())
 local lastIteration = os.clock()
 local frameCount = 0
@@ -3241,48 +3382,8 @@ table.insert(connections, RunService.RenderStepped:Connect(function()
         islandPing.Text = "Ping: " .. string.format("%.0f ms", ping * 1000)
     end
     
-    -- Sync DeepDark sitting mascot position, size and transparency
-    if deepDarkMascot then
-        if currentTheme == "DeepDark" or currentTheme == "Light" then
-            local isLight = (currentTheme == "Light")
-            if mainFrame.Visible then
-                deepDarkMascot.Size = isLight and UDim2.new(0, 85, 0, 140) or UDim2.new(0, 140, 0, 140)
-                local mainPos = mainFrame.AbsolutePosition
-                -- Align bottom-left of mascot to top-left of mainFrame with a small overlap (legs hanging over titleBar)
-                local offsetX = isLight and 15 or 10
-                local offsetY = isLight and 44 or 38
-                deepDarkMascot.Position = UDim2.new(0, mainPos.X + offsetX, 0, mainPos.Y + offsetY)
-                deepDarkMascot.ImageTransparency = mainFrame.GroupTransparency
-                wasMainVisible = true
-            elseif islandFrame and islandFrame.Visible then
-                deepDarkMascot.Size = isLight and UDim2.new(0, 24, 0, 40) or UDim2.new(0, 40, 0, 40)
-                local islandPos = islandFrame.AbsolutePosition
-                -- Align bottom-left of mascot to top-left of islandFrame with a small overlap (legs hanging over island)
-                local offsetX = isLight and 0 or -4
-                local offsetY = isLight and 18 or 14
-                deepDarkMascot.Position = UDim2.new(0, islandPos.X + offsetX, 0, islandPos.Y + offsetY)
-                
-                -- Smoothly fade in on the island when the menu finishes closing
-                if wasMainVisible then
-                    wasMainVisible = false
-                    deepDarkMascot.ImageTransparency = 1
-                    TweenService:Create(deepDarkMascot, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                        ImageTransparency = 0
-                    }):Play()
-                end
-            else
-                -- Hide off-screen and make transparent to keep the texture preloaded in GPU memory
-                deepDarkMascot.Position = UDim2.new(0, -500, 0, -500)
-                deepDarkMascot.ImageTransparency = 1
-                wasMainVisible = false
-            end
-        else
-            -- Hide off-screen and make transparent to keep the texture preloaded in GPU memory
-            deepDarkMascot.Position = UDim2.new(0, -500, 0, -500)
-            deepDarkMascot.ImageTransparency = 1
-            wasMainVisible = false
-        end
-    end
+    -- Sync DeepDark / Light sitting mascot position, size and transparency
+    pcall(syncMascotPositionAndSize)
 end))
 
 -- ==================== LOADING SCREEN ====================

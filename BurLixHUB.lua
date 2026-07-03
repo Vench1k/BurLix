@@ -139,6 +139,22 @@ local function getLightMascotAsset()
     return "rbxthumb://type=Asset&id=3116499937&w=420&h=420"
 end
 
+-- Helper to retrieve local Mimi mascot asset
+local function getMimiMascotAsset()
+    local fileName = "Mimi.png"
+    if isfile and not isfile(fileName) and isfile("mimi.png") then
+        fileName = "mimi.png"
+    end
+    if getcustomasset then
+        local success, asset = pcall(getcustomasset, fileName)
+        if success and asset then
+            return asset
+        end
+    end
+    -- Fallback to Puro decal if custom assets are not supported or file is missing
+    return "rbxthumb://type=Asset&id=3116499937&w=420&h=420"
+end
+
 -- Asynchronously pre-download mascot file on startup to prevent pop-in delay
 task.spawn(function()
     if writefile and isfile then
@@ -202,7 +218,7 @@ local islandToggle = nil
 
 local function syncMascotPositionAndSize()
     if not deepDarkMascot then return end
-    if mascotLayoutTheme == "DeepDark" or mascotLayoutTheme == "Light" then
+    if mascotLayoutTheme == "DeepDark" or mascotLayoutTheme == "Light" or mascotLayoutTheme == "Mimi" then
         local isLight = (mascotLayoutTheme == "Light")
         if mainFrame and mainFrame.Visible then
             deepDarkMascot.Size = isLight and UDim2.new(0, 85, 0, 140) or UDim2.new(0, 140, 0, 140)
@@ -467,6 +483,14 @@ local themes = {
         Sidebar = Color3.fromRGB(13, 13, 16),
         Card = Color3.fromRGB(20, 20, 25),
         Text = Color3.fromRGB(240, 240, 245)
+    },
+    Mimi = {
+        Background = Color3.fromRGB(113, 78, 74),
+        Header = Color3.fromRGB(96, 65, 62),
+        Accent = Color3.fromRGB(236, 189, 153),
+        Sidebar = Color3.fromRGB(103, 71, 68),
+        Card = Color3.fromRGB(126, 88, 84),
+        Text = Color3.fromRGB(255, 241, 229)
     }
 }
 
@@ -581,6 +605,8 @@ local function applyTheme(themeName)
                     targetImage = "rbxthumb://type=Asset&id=3116499937&w=420&h=420"
                 elseif themeName == "Light" then
                     targetImage = getLightMascotAsset()
+                elseif themeName == "Mimi" then
+                    targetImage = getMimiMascotAsset()
                 end
                 
                 local isCurrentlyVisible = (deepDarkMascot.Position.X.Offset > -100) and (deepDarkMascot.ImageTransparency < 1)
@@ -678,7 +704,8 @@ local function applyTheme(themeName)
     for _, elem in ipairs(themeElements.Accent) do
         pcall(function()
             if elem:IsA("TextLabel") or elem:IsA("TextBox") or elem:IsA("TextButton") then
-                TweenService:Create(elem, tweenInfo, {TextColor3 = colors.Accent}):Play()
+                local targetColor = (themeName == "Light") and Color3.fromRGB(138, 58, 92) or colors.Accent
+                TweenService:Create(elem, tweenInfo, {TextColor3 = targetColor}):Play()
             elseif elem:IsA("UIStroke") then
                 TweenService:Create(elem, tweenInfo, {Color = colors.Accent}):Play()
             else
@@ -703,7 +730,7 @@ local function applyTheme(themeName)
     if titleText then
         local tweenInfoFast = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
         -- Shift titleText to prevent overlap with mascot: X=150 for DeepDark (width 140), X=110 for Light (width 85), X=15 for others
-        local targetX = (themeName == "DeepDark" and 150) or (themeName == "Light" and 110) or 15
+        local targetX = ((themeName == "DeepDark" or themeName == "Mimi") and 150) or (themeName == "Light" and 110) or 15
         pcall(function()
             TweenService:Create(titleText, tweenInfoFast, {
                 Position = UDim2.new(0, targetX, 0, 0)
@@ -2283,7 +2310,7 @@ themeLayout.SortOrder = Enum.SortOrder.LayoutOrder
 themeLayout.Parent = themeContainer
 
 local function createThemeCell(idx, name)
-    local isNewTheme = (name == "Light" or name == "DeepDark")
+    local isNewTheme = (name == "Light" or name == "DeepDark" or name == "Mimi")
     
     local cell = Instance.new("Frame")
     cell.LayoutOrder = idx
@@ -2396,7 +2423,7 @@ local function createThemeCell(idx, name)
     updateBtnStyle()
 end
 
-local themeNames = {"Dark", "Purple", "Aqua", "Sakura", "Cyberpunk", "Forest", "Nordic", "Sunset", "Midnight", "Emerald", "Nebula", "Monochrome", "Light", "DeepDark"}
+local themeNames = {"Dark", "Purple", "Aqua", "Sakura", "Cyberpunk", "Forest", "Nordic", "Sunset", "Midnight", "Emerald", "Nebula", "Monochrome", "Light", "DeepDark", "Mimi"}
 for idx, name in ipairs(themeNames) do
     createThemeCell(idx, name)
 end

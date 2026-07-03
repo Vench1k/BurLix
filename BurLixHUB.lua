@@ -95,6 +95,64 @@ local function hexToColor(hex)
     return nil
 end
 
+-- Helper function to download file content via HttpGet or request
+local function downloadFile(url)
+    local content = nil
+    if game and game.HttpGet then
+        pcall(function()
+            content = game:HttpGet(url)
+        end)
+    end
+    if not content and request then
+        pcall(function()
+            local res = request({
+                Url = url,
+                Method = "GET"
+            })
+            if res and res.StatusCode == 200 then
+                content = res.Body
+            end
+        end)
+    end
+    return content
+end
+
+-- Helper to retrieve or cache Light mascot asset
+local function getLightMascotAsset()
+    local fileName = "WhiteFurry.png"
+    if writefile and readfile and isfile and getcustomasset then
+        if not isfile(fileName) then
+            local url = "https://raw.githubusercontent.com/Vench1k/roblox-custom-tools/main/WhiteFurry.png"
+            local content = downloadFile(url)
+            if content and #content > 0 then
+                pcall(writefile, fileName, content)
+            end
+        end
+        if isfile(fileName) then
+            local success, asset = pcall(getcustomasset, fileName)
+            if success and asset then
+                return asset
+            end
+        end
+    end
+    -- Fallback to default decal if custom assets are not supported
+    return "rbxthumb://type=Asset&id=3116499937&w=420&h=420"
+end
+
+-- Asynchronously pre-download mascot file on startup to prevent pop-in delay
+task.spawn(function()
+    if writefile and isfile then
+        local fileName = "WhiteFurry.png"
+        if not isfile(fileName) then
+            local url = "https://raw.githubusercontent.com/Vench1k/roblox-custom-tools/main/WhiteFurry.png"
+            local content = downloadFile(url)
+            if content and #content > 0 then
+                pcall(writefile, fileName, content)
+            end
+        end
+    end
+end)
+
 -- Fallback Settings
 local currentWalkSpeed = 16
 local speedHackEnabled = false
@@ -436,7 +494,8 @@ local function updateTabColors()
     end
     if settingsButton then
         local targetSettingsBgColor = (activeTabName == "Settings") and colors.Accent or colors.Header
-        local targetSettingsTextColor = (activeTabName == "Settings") and Color3.fromRGB(255, 255, 255) or colors.Text
+        local isAccentLight = (colors.Accent.R * 0.299 + colors.Accent.G * 0.587 + colors.Accent.B * 0.114) > 0.7
+        local targetSettingsTextColor = (activeTabName == "Settings") and (isAccentLight and Color3.fromRGB(30, 30, 35) or Color3.fromRGB(255, 255, 255)) or colors.Text
         pcall(function()
             TweenService:Create(settingsButton, tweenInfo, {
                 BackgroundColor3 = targetSettingsBgColor
@@ -458,6 +517,16 @@ local function applyTheme(themeName)
     if not colors then return end
     
     local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    
+    if deepDarkMascot then
+        if themeName == "DeepDark" then
+            deepDarkMascot.Image = "rbxthumb://type=Asset&id=3116499937&w=420&h=420"
+        elseif themeName == "Light" then
+            pcall(function()
+                deepDarkMascot.Image = getLightMascotAsset()
+            end)
+        end
+    end
     
     for _, elem in ipairs(themeElements.Background) do
         pcall(function()
@@ -835,7 +904,7 @@ titleText.Name = "TitleText"
 titleText.Size = UDim2.new(1, -90, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "BurLix HUB v2.2.2"
+titleText.Text = "BurLix HUB v2.2.8"
 titleText.TextColor3 = Color3.fromRGB(240, 240, 245)
 titleText.TextSize = 18
 titleText.TextXAlignment = Enum.TextXAlignment.Left
@@ -1289,6 +1358,17 @@ local function createSlider(tabFrame, name, minVal, maxVal, defaultVal, layoutOr
     sliderBtnCorner.CornerRadius = UDim.new(1, 0)
     sliderBtnCorner.Parent = sliderButton
     
+    local function updateSliderKnob()
+        local colors = themes[currentTheme]
+        if colors then
+            local isSidebarLight = (colors.Sidebar.R * 0.299 + colors.Sidebar.G * 0.587 + colors.Sidebar.B * 0.114) > 0.7
+            local isAccentLight = (colors.Accent.R * 0.299 + colors.Accent.G * 0.587 + colors.Accent.B * 0.114) > 0.7
+            sliderButton.BackgroundColor3 = (isSidebarLight or isAccentLight) and Color3.fromRGB(80, 80, 85) or Color3.fromRGB(240, 240, 245)
+        end
+    end
+    table.insert(toggleUpdaters, updateSliderKnob)
+    updateSliderKnob()
+    
     local function updateSlider(percentage)
         percentage = math.clamp(percentage, 0, 1)
         sliderFill.Size = UDim2.new(percentage, 0, 1, 0)
@@ -1395,6 +1475,13 @@ local function createToggle(tabFrame, name, defaultVal, layoutOrder, onChange, o
         local colors = themes[currentTheme]
         if colors then
             toggleButton.BackgroundColor3 = enabled and colors.Accent or colors.Sidebar
+            local isBgLight = false
+            if enabled then
+                isBgLight = (colors.Accent.R * 0.299 + colors.Accent.G * 0.587 + colors.Accent.B * 0.114) > 0.7
+            else
+                isBgLight = (colors.Sidebar.R * 0.299 + colors.Sidebar.G * 0.587 + colors.Sidebar.B * 0.114) > 0.7
+            end
+            knob.BackgroundColor3 = isBgLight and Color3.fromRGB(80, 80, 85) or Color3.fromRGB(240, 240, 245)
         end
     end
     
@@ -1408,8 +1495,18 @@ local function createToggle(tabFrame, name, defaultVal, layoutOrder, onChange, o
         local targetColor = colors and (enabled and colors.Accent or colors.Sidebar) or (enabled and Color3.fromRGB(80, 80, 250) or Color3.fromRGB(35, 35, 40))
         local targetPos = enabled and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
         
+        local isBgLight = false
+        if colors then
+            if enabled then
+                isBgLight = (colors.Accent.R * 0.299 + colors.Accent.G * 0.587 + colors.Accent.B * 0.114) > 0.7
+            else
+                isBgLight = (colors.Sidebar.R * 0.299 + colors.Sidebar.G * 0.587 + colors.Sidebar.B * 0.114) > 0.7
+            end
+        end
+        local targetKnobColor = isBgLight and Color3.fromRGB(80, 80, 85) or Color3.fromRGB(240, 240, 245)
+        
         TweenService:Create(toggleButton, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
-        TweenService:Create(knob, TweenInfo.new(0.2), {Position = targetPos}):Play()
+        TweenService:Create(knob, TweenInfo.new(0.2), {Position = targetPos, BackgroundColor3 = targetKnobColor}):Play()
         
         onChange(enabled)
     end
@@ -1680,6 +1777,17 @@ local function createSettingsPanel(tabFrame, layoutOrder, defaultColor, onColorC
         sliderBtnCorner.CornerRadius = UDim.new(1, 0)
         sliderBtnCorner.Parent = sliderButton
         
+        local function updateCompactKnob()
+            local colors = themes[currentTheme]
+            if colors then
+                local isSidebarLight = (colors.Sidebar.R * 0.299 + colors.Sidebar.G * 0.587 + colors.Sidebar.B * 0.114) > 0.7
+                local isAccentLight = (colors.Accent.R * 0.299 + colors.Accent.G * 0.587 + colors.Accent.B * 0.114) > 0.7
+                sliderButton.BackgroundColor3 = (isSidebarLight or isAccentLight) and Color3.fromRGB(80, 80, 85) or Color3.fromRGB(240, 240, 245)
+            end
+        end
+        table.insert(toggleUpdaters, updateCompactKnob)
+        updateCompactKnob()
+        
         local function updateVal(percentage)
             percentage = math.clamp(percentage, 0, 1)
             sliderFill.Size = UDim2.new(percentage, 0, 1, 0)
@@ -1812,13 +1920,18 @@ local function createSettingsPanel(tabFrame, layoutOrder, defaultColor, onColorC
             if not skipHexUpdate then
                 hexInput.Text = colorToHex(color)
             end
-            -- Highlight active preset button
+            -- Highlight active preset button with theme-aware colors
+            local colors = themes[currentTheme]
+            local isSidebarLight = colors and ((colors.Sidebar.R * 0.299 + colors.Sidebar.G * 0.587 + colors.Sidebar.B * 0.114) > 0.7)
+            local activeStrokeColor = isSidebarLight and Color3.fromRGB(30, 30, 35) or Color3.fromRGB(240, 240, 245)
+            local inactiveStrokeColor = isSidebarLight and Color3.fromRGB(200, 200, 205) or Color3.fromRGB(35, 35, 40)
+            
             for _, child in ipairs(presetsContainer:GetChildren()) do
                 if child:IsA("TextButton") then
                     local stroke = child:FindFirstChild("UIStroke")
                     if stroke then
                         local isMatch = (child.BackgroundColor3.R == color.R and child.BackgroundColor3.G == color.G and child.BackgroundColor3.B == color.B)
-                        stroke.Color = isMatch and Color3.fromRGB(240, 240, 245) or Color3.fromRGB(35, 35, 40)
+                        stroke.Color = isMatch and activeStrokeColor or inactiveStrokeColor
                     end
                 end
             end
@@ -2109,7 +2222,8 @@ local function createThemeCell(idx, name)
     local function updateBtnStyle()
         local colors = themes[currentTheme]
         if currentTheme == name then
-            cellStroke.Color = Color3.fromRGB(240, 240, 245)
+            local isAccentLight = (colors.Accent.R * 0.299 + colors.Accent.G * 0.587 + colors.Accent.B * 0.114) > 0.7
+            cellStroke.Color = isAccentLight and Color3.fromRGB(30, 30, 35) or colors.Accent
             cellStroke.Thickness = 2
         else
             if isNewTheme then
@@ -2221,7 +2335,8 @@ local function createFontCell(idx, name)
         local colors = themes[currentTheme]
         if currentFontFamily == name then
             btn.BackgroundColor3 = colors.Accent
-            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            local isAccentLight = (colors.Accent.R * 0.299 + colors.Accent.G * 0.587 + colors.Accent.B * 0.114) > 0.7
+            btn.TextColor3 = isAccentLight and Color3.fromRGB(30, 30, 35) or Color3.fromRGB(255, 255, 255)
         else
             btn.BackgroundColor3 = colors.Sidebar
             btn.TextColor3 = colors.Text
@@ -2749,7 +2864,7 @@ creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v2.2.2\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v2.2.8\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -2780,7 +2895,7 @@ changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v2.2.2:\n- Added sitting mascot (decal ID 3116499937 using rbxthumb format) sitting on the top-left corner of the window, exclusive to the DeepDark theme.\n- Mascot follows window drag/tween dynamically and fades in/out matching GroupTransparency.\n\nChangelog v2.2.1:\n- Fixed UIStroke outlines (profile, bind, keybind, hex textboxes) to dynamically adapt their colors with themes, resolving the harsh dark/bold outlines on the Light theme.\n\nChangelog v2.2.0:\n- Added new themes: \"Light\" (clean light design) and \"DeepDark\" (extra dark high contrast design with hot red accents).\n- Visually highlighted the new themes in the selector grid using golden/orange outlines and custom floating \"NEW\" badges.\n- Expanded the theme container height to 135px to prevent grid cell clipping.\n\nChangelog v2.1.3:\n- Increased corner rounding of compact slider field backgrounds to 6px for a smoother look.\n\nChangelog v2.1.2:\n- Adjusted slider track background transparency to 0.38 (slightly more visible as requested).\n- Implemented dynamic loading screen stages (randomizes stages, speeds, pauses, and introduces occasional artificial loading lags/stalls for maximum realism).\n\nChangelog v2.1.1:\n- Adjusted slider track background transparency to 0.55 to make the groove container less prominent and blend softly with the settings panel.\n\nChangelog v2.1.0:\n- Added a distinct rounded background container specifically behind the slider track area (from start to end), serving as an interactive groove/channel.\n- Bound slider click/drag detection to the entire track background for better responsiveness.\n\nChangelog v2.0.9:\n- Added a distinct background card (bubble) and proper padding/margins for each compact slider to visually isolate them within the settings panel.\n\nChangelog v2.0.8:\n- Fixed compact sliders layout (widened labels to prevent text overlap, added right margin to prevent sliders from touching the edge).\n\nChangelog v2.0.7:\n- Excluded LocalPlayer from visual effects (Chams, Borders, Names, Boxes).\n\nChangelog v2.0.6:\n- Aligned loading screen style with the main menu theme (glass transparency, header borders, no gradient)."
+changelogLabel.Text = "Changelog v2.2.8:\n- Added light theme mascot (WhiteFurry.png) automatically downloaded and cached from GitHub.\n- Configured mascot to render dynamically on both Light and DeepDark themes.\n\nChangelog v2.2.7:\n- Optimized contrast on Monochrome and Light themes (active font text, slider knobs, preset outlines, theme cells).\n\nChangelog v2.2.6:\n- Fixed Luau register limit compilation errors by scoping variables.\n- Implemented GPU-caching preload for decals to eliminate white square lag.\n- Improved loading screen with real asset preload.\n\nChangelog v2.2.2:\n- Added sitting mascot (decal ID 3116499937 using rbxthumb format) sitting on the top-left corner of the window, exclusive to the DeepDark theme.\n- Mascot follows window drag/tween dynamically and fades in/out matching GroupTransparency.\n\nChangelog v2.2.1:\n- Fixed UIStroke outlines (profile, bind, keybind, hex textboxes) to dynamically adapt their colors with themes, resolving the harsh dark/bold outlines on the Light theme.\n\nChangelog v2.2.0:\n- Added new themes: \"Light\" (clean light design) and \"DeepDark\" (extra dark high contrast design with hot red accents).\n- Visually highlighted the new themes in the selector grid using golden/orange outlines and custom floating \"NEW\" badges.\n- Expanded the theme container height to 135px to prevent grid cell clipping.\n\nChangelog v2.1.3:\n- Increased corner rounding of compact slider field backgrounds to 6px for a smoother look.\n\nChangelog v2.1.2:\n- Adjusted slider track background transparency to 0.38 (slightly more visible as requested).\n- Implemented dynamic loading screen stages (randomizes stages, speeds, pauses, and introduces occasional artificial loading lags/stalls for maximum realism).\n\nChangelog v2.1.1:\n- Adjusted slider track background transparency to 0.55 to make the groove container less prominent and blend softly with the settings panel.\n\nChangelog v2.1.0:\n- Added a distinct rounded background container specifically behind the slider track area (from start to end), serving as an interactive groove/channel.\n- Bound slider click/drag detection to the entire track background for better responsiveness.\n\nChangelog v2.0.9:\n- Added a distinct background card (bubble) and proper padding/margins for each compact slider to visually isolate them within the settings panel.\n\nChangelog v2.0.8:\n- Fixed compact sliders layout (widened labels to prevent text overlap, added right margin to prevent sliders from touching the edge).\n\nChangelog v2.0.7:\n- Excluded LocalPlayer from visual effects (Chams, Borders, Names, Boxes).\n\nChangelog v2.0.6:\n- Aligned loading screen style with the main menu theme (glass transparency, header borders, no gradient)."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -3127,7 +3242,7 @@ table.insert(connections, RunService.RenderStepped:Connect(function()
     
     -- Sync DeepDark sitting mascot position, size and transparency
     if deepDarkMascot then
-        if currentTheme == "DeepDark" then
+        if currentTheme == "DeepDark" or currentTheme == "Light" then
             if mainFrame.Visible then
                 deepDarkMascot.Size = UDim2.new(0, 140, 0, 140)
                 local mainPos = mainFrame.AbsolutePosition

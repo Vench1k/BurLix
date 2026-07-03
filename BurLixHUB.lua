@@ -177,6 +177,234 @@ local deepDarkMascot = nil
 local wasMainVisible = false
 local titleText = nil
 
+-- Visual Skin Changer State Variables
+local visualSkinEnabled = false
+local currentTargetUserId = nil
+local originalSkinSaved = false
+local originalBodyColors = nil
+local originalShirt = nil
+local originalPants = nil
+local originalShirtGraphic = nil
+local originalFaceTexture = nil
+local originalAccessories = {}
+local originalScales = {}
+
+-- Resolve username or ID to a numeric User ID
+local function resolveUserId(inputString)
+    inputString = string.gsub(inputString, "^%s*(.-)%s*$", "%1") -- trim whitespace
+    if tonumber(inputString) then
+        return tonumber(inputString)
+    end
+    local success, userId = pcall(function()
+        return Players:GetUserIdFromNameAsync(inputString)
+    end)
+    if success and userId then
+        return userId
+    end
+    return nil
+end
+
+-- Save the original player outfit and colors
+local function saveOriginalSkin(char)
+    if originalSkinSaved then return end
+    originalSkinSaved = true
+    
+    originalAccessories = {}
+    originalScales = {}
+    
+    local bodyColors = char:FindFirstChildOfClass("BodyColors")
+    if bodyColors then
+        originalBodyColors = bodyColors:Clone()
+    else
+        originalBodyColors = nil
+    end
+    
+    local shirt = char:FindFirstChildOfClass("Shirt")
+    if shirt then
+        originalShirt = shirt:Clone()
+    else
+        originalShirt = nil
+    end
+    
+    local pants = char:FindFirstChildOfClass("Pants")
+    if pants then
+        originalPants = pants:Clone()
+    else
+        originalPants = nil
+    end
+    
+    local shirtGraphic = char:FindFirstChildOfClass("ShirtGraphic")
+    if shirtGraphic then
+        originalShirtGraphic = shirtGraphic:Clone()
+    else
+        originalShirtGraphic = nil
+    end
+    
+    local head = char:FindFirstChild("Head")
+    local face = head and head:FindFirstChild("face")
+    if face and face:IsA("Decal") then
+        originalFaceTexture = face.Texture
+    else
+        originalFaceTexture = "rbxasset://textures/face.png"
+    end
+    
+    for _, child in ipairs(char:GetChildren()) do
+        if child:IsA("Accessory") then
+            table.insert(originalAccessories, child:Clone())
+        end
+    end
+    
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        for _, val in ipairs(hum:GetChildren()) do
+            if val:IsA("NumberValue") and (val.Name:find("Scale") or val.Name == "HeadScale") then
+                originalScales[val.Name] = val.Value
+            end
+        end
+    end
+end
+
+-- Restore original outfit, face and scaling
+local function restoreOriginalSkin()
+    local char = player.Character
+    if not char then return end
+    
+    for _, child in ipairs(char:GetChildren()) do
+        if child:IsA("Accessory") or child:IsA("Shirt") or child:IsA("Pants") or child:IsA("ShirtGraphic") or child:IsA("BodyColors") then
+            child:Destroy()
+        end
+    end
+    
+    if originalBodyColors then
+        local success, err = pcall(function()
+            originalBodyColors:Clone().Parent = char
+        end)
+        if not success then
+            warn("BurLixHUB: Failed to clone originalBodyColors:", err)
+        end
+    end
+    
+    if originalShirt then
+        pcall(function() originalShirt:Clone().Parent = char end)
+    end
+    if originalPants then
+        pcall(function() originalPants:Clone().Parent = char end)
+    end
+    if originalShirtGraphic then
+        pcall(function() originalShirtGraphic:Clone().Parent = char end)
+    end
+    
+    local head = char:FindFirstChild("Head")
+    if head then
+        local face = head:FindFirstChild("face")
+        if face and face:IsA("Decal") then
+            face.Texture = originalFaceTexture
+        else
+            local newFace = Instance.new("Decal")
+            newFace.Name = "face"
+            newFace.Texture = originalFaceTexture
+            newFace.Parent = head
+        end
+    end
+    
+    for _, acc in ipairs(originalAccessories) do
+        pcall(function() acc:Clone().Parent = char end)
+    end
+    
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        for name, value in pairs(originalScales) do
+            local valObj = hum:FindFirstChild(name)
+            if valObj and valObj:IsA("NumberValue") then
+                valObj.Value = value
+            end
+        end
+    end
+end
+
+-- Fetch character model from UserId and apply clothes, colors, decals & accessories
+local function applyVisualSkin(userId)
+    local char = player.Character
+    if not char then return end
+    
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    
+    saveOriginalSkin(char)
+    
+    local success, model = pcall(function()
+        return Players:CreateHumanoidModelFromUserId(userId)
+    end)
+    
+    if not success or not model then
+        warn("BurLixHUB: Failed to load humanoid model for UserId: " .. tostring(userId))
+        return false
+    end
+    
+    -- Clear current clothes, accessories, and body colors
+    for _, child in ipairs(char:GetChildren()) do
+        if child:IsA("Accessory") or child:IsA("Shirt") or child:IsA("Pants") or child:IsA("ShirtGraphic") or child:IsA("BodyColors") then
+            child:Destroy()
+        end
+    end
+    
+    local targetColors = model:FindFirstChildOfClass("BodyColors")
+    if targetColors then
+        pcall(function() targetColors:Clone().Parent = char end)
+    end
+    
+    local targetShirt = model:FindFirstChildOfClass("Shirt")
+    if targetShirt then
+        pcall(function() targetShirt:Clone().Parent = char end)
+    end
+    
+    local targetPants = model:FindFirstChildOfClass("Pants")
+    if targetPants then
+        pcall(function() targetPants:Clone().Parent = char end)
+    end
+    
+    local targetGraphic = model:FindFirstChildOfClass("ShirtGraphic")
+    if targetGraphic then
+        pcall(function() targetGraphic:Clone().Parent = char end)
+    end
+    
+    local targetHead = model:FindFirstChild("Head")
+    local targetFace = targetHead and targetHead:FindFirstChild("face")
+    local localHead = char:FindFirstChild("Head")
+    if localHead then
+        local localFace = localHead:FindFirstChild("face")
+        if localFace and localFace:IsA("Decal") then
+            localFace.Texture = targetFace and targetFace.Texture or "rbxasset://textures/face.png"
+        else
+            localFace = Instance.new("Decal")
+            localFace.Name = "face"
+            localFace.Texture = targetFace and targetFace.Texture or "rbxasset://textures/face.png"
+            localFace.Parent = localHead
+        end
+    end
+    
+    for _, child in ipairs(model:GetChildren()) do
+        if child:IsA("Accessory") then
+            pcall(function() child:Clone().Parent = char end)
+        end
+    end
+    
+    local targetHum = model:FindFirstChildOfClass("Humanoid")
+    if targetHum then
+        for _, val in ipairs(targetHum:GetChildren()) do
+            if val:IsA("NumberValue") and (val.Name:find("Scale") or val.Name == "HeadScale") then
+                local localVal = hum:FindFirstChild(val.Name)
+                if localVal and localVal:IsA("NumberValue") then
+                    localVal.Value = val.Value
+                end
+            end
+        end
+    end
+    
+    model:Destroy()
+    return true
+end
+
 -- Tab and Settings State variables
 local lastActiveTab = "Player"
 local activeTabName = "Player"
@@ -902,7 +1130,7 @@ titleText.Name = "TitleText"
 titleText.Size = UDim2.new(1, -90, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "BurLix HUB v2.2.8"
+titleText.Text = "BurLix HUB v2.2.9"
 titleText.TextColor3 = Color3.fromRGB(240, 240, 245)
 titleText.TextSize = 18
 titleText.TextXAlignment = Enum.TextXAlignment.Left
@@ -1995,7 +2223,7 @@ local function createSettingsPanel(tabFrame, layoutOrder, defaultColor, onColorC
 end
 
 -- Create Tabs (Decreased Authors tab canvas height since Reset buttons are removed)
-playerTab = createTab("Player", 1, 200)
+playerTab = createTab("Player", 1, 300)
 worldTab = createTab("World", 2, 200)
 authorsTab = createTab("Authors", 3, 520)
 visualsTab = createTab("Visuals", 4, 850)
@@ -2367,6 +2595,8 @@ showTab("Player")
 -- Re-hook humanoid and re-apply settings on character respawn (preserving slider settings)
 table.insert(connections, player.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
+    originalSkinSaved = false -- Reset saved state on fresh spawn
+    
     local hum = newCharacter:WaitForChild("Humanoid", 10)
     if hum then
         humanoid = hum
@@ -2381,6 +2611,9 @@ table.insert(connections, player.CharacterAdded:Connect(function(newCharacter)
                 else
                     hum.JumpHeight = currentJumpValue
                 end
+            end
+            if visualSkinEnabled and currentTargetUserId then
+                applyVisualSkin(currentTargetUserId)
             end
         end)
     end
@@ -2820,6 +3053,126 @@ clickTPRow = createToggle(playerTab, "Click TP", false, 5, function(state)
     end
 end)
 
+-- Visual Skin Changer Toggle
+local visualSkinRow = createToggle(playerTab, "Visual Skin", false, 6, function(state)
+    visualSkinEnabled = state
+    if state then
+        if currentTargetUserId then
+            task.spawn(function()
+                applyVisualSkin(currentTargetUserId)
+            end)
+        else
+            currentTargetUserId = player.UserId
+            task.spawn(function()
+                applyVisualSkin(currentTargetUserId)
+            end)
+        end
+    else
+        restoreOriginalSkin()
+        originalSkinSaved = false
+    end
+end, function()
+    if skinSettingsPanel and skinSettingsHeight then
+        toggleSettingsPanel(skinSettingsPanel, skinSettingsHeight)
+    end
+end)
+
+-- Custom skin settings panel (input for target user)
+local skinSettingsPanel = Instance.new("Frame")
+skinSettingsPanel.Name = "SkinSettingsPanel"
+skinSettingsPanel.Size = UDim2.new(1, 0, 0, 0)
+skinSettingsPanel.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+skinSettingsPanel.BorderSizePixel = 0
+skinSettingsPanel.LayoutOrder = 7
+skinSettingsPanel.Visible = false
+skinSettingsPanel.ClipsDescendants = true
+skinSettingsPanel.Parent = playerTab
+registerThemeElement(skinSettingsPanel, "Sidebar")
+
+local panelCorner = Instance.new("UICorner")
+panelCorner.CornerRadius = UDim.new(0, 3)
+panelCorner.Parent = skinSettingsPanel
+
+local panelPadding = Instance.new("UIPadding")
+panelPadding.PaddingTop = UDim.new(0, 5)
+panelPadding.PaddingBottom = UDim.new(0, 5)
+panelPadding.PaddingLeft = UDim.new(0, 10)
+panelPadding.PaddingRight = UDim.new(0, 10)
+panelPadding.Parent = skinSettingsPanel
+
+local inputRow = Instance.new("Frame")
+inputRow.Size = UDim2.new(1, 0, 0, 24)
+inputRow.BackgroundTransparency = 1
+inputRow.BorderSizePixel = 0
+inputRow.Parent = skinSettingsPanel
+
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(0, 120, 1, 0)
+label.BackgroundTransparency = 1
+label.Text = "Username or ID:"
+label.TextColor3 = Color3.fromRGB(180, 180, 185)
+label.TextSize = 11
+label.Font = Enum.Font.SourceSansBold
+label.TextXAlignment = Enum.TextXAlignment.Left
+label.Parent = inputRow
+registerThemeElement(label, "Text")
+registerFontElement(label, "Bold")
+
+local txtInput = Instance.new("TextBox")
+txtInput.Size = UDim2.new(1, -130, 0, 18)
+txtInput.Position = UDim2.new(0, 125, 0.5, -9)
+txtInput.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+txtInput.BorderSizePixel = 0
+txtInput.Text = player.Name
+txtInput.TextColor3 = Color3.fromRGB(220, 220, 225)
+txtInput.TextSize = 10
+txtInput.Font = Enum.Font.Code
+txtInput.ClearTextOnFocus = false
+txtInput.Parent = inputRow
+registerThemeElement(txtInput, "Background")
+registerThemeElement(txtInput, "Text")
+
+local txtCorner = Instance.new("UICorner")
+txtCorner.CornerRadius = UDim.new(0, 2)
+txtCorner.Parent = txtInput
+
+local txtStroke = Instance.new("UIStroke")
+txtStroke.Thickness = 1
+txtStroke.Color = Color3.fromRGB(50, 50, 55)
+txtStroke.Parent = txtInput
+registerThemeElement(txtStroke, "Header")
+
+local skinSettingsHeight = 34
+
+table.insert(connections, txtInput.FocusLost:Connect(function(enterPressed)
+    local input = txtInput.Text
+    if input == "" then
+        input = player.Name
+        txtInput.Text = input
+    end
+    
+    task.spawn(function()
+        local userId = resolveUserId(input)
+        if userId then
+            currentTargetUserId = userId
+            txtStroke.Color = Color3.fromRGB(50, 180, 50) -- Green feedback
+            task.delay(0.5, function()
+                local cols = themes[currentTheme]
+                txtStroke.Color = cols and cols.Header or Color3.fromRGB(50, 50, 55)
+            end)
+            if visualSkinEnabled then
+                applyVisualSkin(userId)
+            end
+        else
+            txtStroke.Color = Color3.fromRGB(180, 50, 50) -- Red feedback
+            task.delay(0.5, function()
+                local cols = themes[currentTheme]
+                txtStroke.Color = cols and cols.Header or Color3.fromRGB(50, 50, 55)
+            end)
+        end
+    end)
+end))
+
 
 -- ==================== WORLD TAB CONTENTS ====================
 
@@ -2865,7 +3218,7 @@ creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v2.2.8\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v2.2.9\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -2890,13 +3243,13 @@ registerThemeElement(thankYouLabel, "Text")
 registerFontElement(thankYouLabel, "Regular")
 
 -- Changelog Card (Taller to comfortably fit wrapped version history text)
-changelogCard = createRow(authorsTab, "ChangelogCard", 195, 2)
+changelogCard = createRow(authorsTab, "ChangelogCard", 215, 2)
 
 changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v2.2.8:\n- Added light theme mascot (WhiteFurry.png) automatically downloaded and cached from GitHub.\n- Configured mascot to render dynamically on both Light and DeepDark themes.\n\nChangelog v2.2.7:\n- Optimized contrast on Monochrome and Light themes (active font text, slider knobs, preset outlines, theme cells).\n\nChangelog v2.2.6:\n- Fixed Luau register limit compilation errors by scoping variables.\n- Implemented GPU-caching preload for decals to eliminate white square lag.\n- Improved loading screen with real asset preload.\n\nChangelog v2.2.2:\n- Added sitting mascot (decal ID 3116499937 using rbxthumb format) sitting on the top-left corner of the window, exclusive to the DeepDark theme.\n- Mascot follows window drag/tween dynamically and fades in/out matching GroupTransparency.\n\nChangelog v2.2.1:\n- Fixed UIStroke outlines (profile, bind, keybind, hex textboxes) to dynamically adapt their colors with themes, resolving the harsh dark/bold outlines on the Light theme.\n\nChangelog v2.2.0:\n- Added new themes: \"Light\" (clean light design) and \"DeepDark\" (extra dark high contrast design with hot red accents).\n- Visually highlighted the new themes in the selector grid using golden/orange outlines and custom floating \"NEW\" badges.\n- Expanded the theme container height to 135px to prevent grid cell clipping.\n\nChangelog v2.1.3:\n- Increased corner rounding of compact slider field backgrounds to 6px for a smoother look.\n\nChangelog v2.1.2:\n- Adjusted slider track background transparency to 0.38 (slightly more visible as requested).\n- Implemented dynamic loading screen stages (randomizes stages, speeds, pauses, and introduces occasional artificial loading lags/stalls for maximum realism).\n\nChangelog v2.1.1:\n- Adjusted slider track background transparency to 0.55 to make the groove container less prominent and blend softly with the settings panel.\n\nChangelog v2.1.0:\n- Added a distinct rounded background container specifically behind the slider track area (from start to end), serving as an interactive groove/channel.\n- Bound slider click/drag detection to the entire track background for better responsiveness.\n\nChangelog v2.0.9:\n- Added a distinct background card (bubble) and proper padding/margins for each compact slider to visually isolate them within the settings panel.\n\nChangelog v2.0.8:\n- Fixed compact sliders layout (widened labels to prevent text overlap, added right margin to prevent sliders from touching the edge).\n\nChangelog v2.0.7:\n- Excluded LocalPlayer from visual effects (Chams, Borders, Names, Boxes).\n\nChangelog v2.0.6:\n- Aligned loading screen style with the main menu theme (glass transparency, header borders, no gradient)."
+changelogLabel.Text = "Changelog v2.2.9:\n- Added Visual Skin Changer in the Player tab. Input Username or User ID to visually copy any outfit.\n\nChangelog v2.2.8:\n- Added light theme mascot (WhiteFurry.png) automatically downloaded and cached from GitHub.\n- Configured mascot to render dynamically on both Light and DeepDark themes.\n\nChangelog v2.2.7:\n- Optimized contrast on Monochrome and Light themes (active font text, slider knobs, preset outlines, theme cells).\n\nChangelog v2.2.6:\n- Fixed Luau register limit compilation errors by scoping variables.\n- Implemented GPU-caching preload for decals to eliminate white square lag.\n- Improved loading screen with real asset preload.\n\nChangelog v2.2.2:\n- Added sitting mascot (decal ID 3116499937 using rbxthumb format) sitting on the top-left corner of the window, exclusive to the DeepDark theme.\n- Mascot follows window drag/tween dynamically and fades in/out matching GroupTransparency.\n\nChangelog v2.2.1:\n- Fixed UIStroke outlines (profile, bind, keybind, hex textboxes) to dynamically adapt their colors with themes, resolving the harsh dark/bold outlines on the Light theme.\n\nChangelog v2.2.0:\n- Added new themes: \"Light\" (clean light design) and \"DeepDark\" (extra dark high contrast design with hot red accents).\n- Visually highlighted the new themes in the selector grid using golden/orange outlines and custom floating \"NEW\" badges.\n- Expanded the theme container height to 135px to prevent grid cell clipping.\n\nChangelog v2.1.3:\n- Increased corner rounding of compact slider field backgrounds to 6px for a smoother look.\n\nChangelog v2.1.2:\n- Adjusted slider track background transparency to 0.38 (slightly more visible as requested).\n- Implemented dynamic loading screen stages (randomizes stages, speeds, pauses, and introduces occasional artificial loading lags/stalls for maximum realism).\n\nChangelog v2.1.1:\n- Adjusted slider track background transparency to 0.55 to make the groove container less prominent and blend softly with the settings panel.\n\nChangelog v2.1.0:\n- Added a distinct rounded background container specifically behind the slider track area (from start to end), serving as an interactive groove/channel.\n- Bound slider click/drag detection to the entire track background for better responsiveness.\n\nChangelog v2.0.9:\n- Added a distinct background card (bubble) and proper padding/margins for each compact slider to visually isolate them within the settings panel.\n\nChangelog v2.0.8:\n- Fixed compact sliders layout (widened labels to prevent text overlap, added right margin to prevent sliders from touching the edge).\n\nChangelog v2.0.7:\n- Excluded LocalPlayer from visual effects (Chams, Borders, Names, Boxes).\n\nChangelog v2.0.6:\n- Aligned loading screen style with the main menu theme (glass transparency, header borders, no gradient)."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.TextXAlignment = Enum.TextXAlignment.Left

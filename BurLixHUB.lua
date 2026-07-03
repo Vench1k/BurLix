@@ -573,8 +573,8 @@ local function applyTheme(themeName)
     
     if titleText then
         local tweenInfoFast = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        -- Shift titleText to prevent overlap with mascot: X=150 for DeepDark (width 140), X=95 for Light (width 85), X=15 for others
-        local targetX = (themeName == "DeepDark" and 150) or (themeName == "Light" and 95) or 15
+        -- Shift titleText to prevent overlap with mascot: X=150 for DeepDark (width 140), X=110 for Light (width 85), X=15 for others
+        local targetX = (themeName == "DeepDark" and 150) or (themeName == "Light" and 110) or 15
         pcall(function()
             TweenService:Create(titleText, tweenInfoFast, {
                 Position = UDim2.new(0, targetX, 0, 0)

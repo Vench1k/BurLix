@@ -52,6 +52,13 @@ pcall(function()
     end
 end)
 
+pcall(function()
+    local oldVisual = Workspace:FindFirstChild("ClickTPVisual")
+    if oldVisual then
+        oldVisual:Destroy()
+    end
+end)
+
 -- Determine safe parenting target (Check if writing to CoreGui is allowed, fallback to PlayerGui)
 local targetParent = playerGui
 if coreGui then
@@ -90,13 +97,27 @@ end
 
 -- Fallback Settings
 local currentWalkSpeed = 16
+local speedHackEnabled = false
+local jumpForceEnabled = false
 local isJumpPower = true
 local currentJumpValue = 50
 local minJump = 0
 local maxJump = 250
+local gravityEnabled = false
+local currentGravityValue = Workspace and Workspace.Gravity or 196.2
+local clickTPEnabled = false
+local clickTPConnection = nil
+local clickTPVisual = nil
 
 local humanoid = nil
 local character = nil
+local settingsButton = nil
+local menuAnimateScale = nil
+local savedMenuPosition = nil
+local deepDarkLogo = nil
+local deepDarkMascot = nil
+local wasMainVisible = false
+local titleText = nil
 
 -- Tab and Settings State variables
 local lastActiveTab = "Player"
@@ -105,6 +126,7 @@ local islandVisible = true
 local fpsVisible = true
 local pingVisible = true
 local menuKeybind = Enum.KeyCode.P
+local listeningForKeybind = false
 local islandFrame = nil
 local islandFPS = nil
 local islandPing = nil
@@ -119,12 +141,12 @@ local tabs = {}
 -- Sidebar tab icons as Roblox image asset IDs
 local tabIcons = {
     Player  = "rbxassetid://10747373176",  -- User/Person icon
-    World   = "rbxassetid://6034684900",   -- Planet icon
-    Visuals = "rbxassetid://10734950309"   -- Eye icon
+    World   = "rbxassetid://10723398002",   -- Planet icon
+    Visuals = "rbxassetid://10723346959"   -- Eye icon
 }
 
 -- Font Families Setup
-local currentFontFamily = "SourceSans"
+local currentFontFamily = "Code"
 local fontFamilies = {
     SourceSans = {
         Regular = Enum.Font.SourceSans,
@@ -145,6 +167,26 @@ local fontFamilies = {
     Ubuntu = {
         Regular = Enum.Font.Ubuntu,
         Bold = Enum.Font.Ubuntu
+    },
+    Montserrat = {
+        Regular = Enum.Font.Montserrat,
+        Bold = Enum.Font.MontserratBold
+    },
+    Arcade = {
+        Regular = Enum.Font.Arcade,
+        Bold = Enum.Font.Arcade
+    },
+    SciFi = {
+        Regular = Enum.Font.SciFi,
+        Bold = Enum.Font.SciFi
+    },
+    Nunito = {
+        Regular = Enum.Font.Nunito,
+        Bold = Enum.Font.Nunito
+    },
+    Fredoka = {
+        Regular = Enum.Font.FredokaOne,
+        Bold = Enum.Font.FredokaOne
     }
 }
 local fontElements = {
@@ -300,6 +342,22 @@ local themes = {
         Sidebar = Color3.fromRGB(28, 28, 28),
         Card = Color3.fromRGB(45, 45, 45),
         Text = Color3.fromRGB(240, 240, 240)
+    },
+    Light = {
+        Background = Color3.fromRGB(240, 240, 245),
+        Header = Color3.fromRGB(220, 220, 225),
+        Accent = Color3.fromRGB(80, 80, 250),
+        Sidebar = Color3.fromRGB(230, 230, 235),
+        Card = Color3.fromRGB(255, 255, 255),
+        Text = Color3.fromRGB(40, 40, 45)
+    },
+    DeepDark = {
+        Background = Color3.fromRGB(10, 10, 12),
+        Header = Color3.fromRGB(16, 16, 20),
+        Accent = Color3.fromRGB(255, 60, 60),
+        Sidebar = Color3.fromRGB(13, 13, 16),
+        Card = Color3.fromRGB(20, 20, 25),
+        Text = Color3.fromRGB(240, 240, 245)
     }
 }
 
@@ -323,12 +381,22 @@ local function registerThemeElement(element, category)
         if category == "Text" then
             element.TextColor3 = colors.Text
         elseif category == "Background" then
-            element.BackgroundColor3 = colors.Background
+            if element:IsA("UIStroke") then
+                element.Color = colors.Background
+            else
+                element.BackgroundColor3 = colors.Background
+            end
         elseif category == "Header" then
-            element.BackgroundColor3 = colors.Header
+            if element:IsA("UIStroke") then
+                element.Color = colors.Header
+            else
+                element.BackgroundColor3 = colors.Header
+            end
         elseif category == "Accent" then
             if element:IsA("TextLabel") or element:IsA("TextBox") or element:IsA("TextButton") then
                 element.TextColor3 = colors.Accent
+            elseif element:IsA("UIStroke") then
+                element.Color = colors.Accent
             else
                 element.BackgroundColor3 = colors.Accent
             end
@@ -371,9 +439,15 @@ local function updateTabColors()
         local targetSettingsTextColor = (activeTabName == "Settings") and Color3.fromRGB(255, 255, 255) or colors.Text
         pcall(function()
             TweenService:Create(settingsButton, tweenInfo, {
-                BackgroundColor3 = targetSettingsBgColor,
-                TextColor3 = targetSettingsTextColor
+                BackgroundColor3 = targetSettingsBgColor
             }):Play()
+            local icon = settingsButton:FindFirstChild("Icon")
+            if icon then
+                TweenService:Create(icon, tweenInfo, {
+                    ImageColor3 = targetSettingsTextColor,
+                    Rotation = (activeTabName == "Settings") and 180 or 0
+                }):Play()
+            end
         end)
     end
 end
@@ -386,15 +460,29 @@ local function applyTheme(themeName)
     local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     
     for _, elem in ipairs(themeElements.Background) do
-        pcall(function() TweenService:Create(elem, tweenInfo, {BackgroundColor3 = colors.Background}):Play() end)
+        pcall(function()
+            if elem:IsA("UIStroke") then
+                TweenService:Create(elem, tweenInfo, {Color = colors.Background}):Play()
+            else
+                TweenService:Create(elem, tweenInfo, {BackgroundColor3 = colors.Background}):Play()
+            end
+        end)
     end
     for _, elem in ipairs(themeElements.Header) do
-        pcall(function() TweenService:Create(elem, tweenInfo, {BackgroundColor3 = colors.Header}):Play() end)
+        pcall(function()
+            if elem:IsA("UIStroke") then
+                TweenService:Create(elem, tweenInfo, {Color = colors.Header}):Play()
+            else
+                TweenService:Create(elem, tweenInfo, {BackgroundColor3 = colors.Header}):Play()
+            end
+        end)
     end
     for _, elem in ipairs(themeElements.Accent) do
         pcall(function()
             if elem:IsA("TextLabel") or elem:IsA("TextBox") or elem:IsA("TextButton") then
                 TweenService:Create(elem, tweenInfo, {TextColor3 = colors.Accent}):Play()
+            elseif elem:IsA("UIStroke") then
+                TweenService:Create(elem, tweenInfo, {Color = colors.Accent}):Play()
             else
                 TweenService:Create(elem, tweenInfo, {BackgroundColor3 = colors.Accent}):Play()
             end
@@ -414,6 +502,19 @@ local function applyTheme(themeName)
         pcall(updater)
     end
     
+    if titleText then
+        local isDeepDark = (themeName == "DeepDark")
+        local tweenInfoFast = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        -- Since the mascot is now even bigger (140x140), starts at X = 10, right edge is at X = 150.
+        -- We shift the title text to X = 150 for DeepDark to prevent overlap, and back to X = 15 for other themes.
+        local targetX = isDeepDark and 150 or 15
+        pcall(function()
+            TweenService:Create(titleText, tweenInfoFast, {
+                Position = UDim2.new(0, targetX, 0, 0)
+            }):Play()
+        end)
+    end
+    
     pcall(updateTabColors)
 end
 
@@ -423,8 +524,21 @@ screenGui.Name = "BurLixGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = targetParent
 
+-- Instantiate sitting mascot for DeepDark theme
+deepDarkMascot = Instance.new("ImageLabel")
+deepDarkMascot.Name = "DeepDarkMascot"
+deepDarkMascot.Size = UDim2.new(0, 140, 0, 140)
+deepDarkMascot.AnchorPoint = Vector2.new(0, 1) -- Anchor bottom-left
+deepDarkMascot.BackgroundTransparency = 1
+deepDarkMascot.Image = "rbxthumb://type=Asset&id=3116499937&w=420&h=420"
+deepDarkMascot.ZIndex = 100 -- Sit on top of mainFrame
+deepDarkMascot.Visible = true -- Keep visible to force GPU preload
+deepDarkMascot.ImageTransparency = 1 -- Start transparent
+deepDarkMascot.Position = UDim2.new(0, -500, 0, -500) -- Start off-screen
+deepDarkMascot.Parent = screenGui
+
 -- Main Frame (Wider to accommodate left tab sidebar)
-local mainFrame = Instance.new("Frame")
+local mainFrame = Instance.new("CanvasGroup")
 mainFrame.Name = "MainFrame"
 mainFrame.Size = UDim2.new(0, 600, 0, 420)
 mainFrame.Position = UDim2.new(0.5, -300, 0.5, -210)
@@ -434,12 +548,17 @@ mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 mainFrame.Draggable = false
 mainFrame.Parent = screenGui
+mainFrame.Visible = false
 registerThemeElement(mainFrame, "Background")
 
 -- UI Corner for Main Frame (Less rounded)
-local mainCorner = Instance.new("UICorner")
+mainCorner = Instance.new("UICorner")
 mainCorner.CornerRadius = UDim.new(0, 4)
 mainCorner.Parent = mainFrame
+
+menuAnimateScale = Instance.new("UIScale")
+menuAnimateScale.Scale = 1.0
+menuAnimateScale.Parent = mainFrame
 
 -- Container for content that will be scaled (leaving mainFrame and resizeGrip outside)
 menuContainer = Instance.new("Frame")
@@ -453,7 +572,7 @@ mainScale = Instance.new("UIScale")
 mainScale.Scale = 1.0
 mainScale.Parent = menuContainer
 
-local resizeGrip = Instance.new("TextButton")
+resizeGrip = Instance.new("TextButton")
 resizeGrip.Name = "ResizeGrip"
 resizeGrip.Size = UDim2.new(0, 16, 0, 16)
 resizeGrip.Position = UDim2.new(1, -16, 1, -16)
@@ -512,10 +631,81 @@ table.insert(connections, resizeGrip.InputChanged:Connect(function(input)
     end
 end))
 
+local isMenuTweening = false
 local function toggleUI()
-    mainFrame.Visible = not mainFrame.Visible
+    if isMenuTweening then return end
+    
+    local targetVisible = not mainFrame.Visible
+    local islandPos = islandFrame and islandFrame.Position or UDim2.new(0.5, 0, 0, 15)
+    
+    if targetVisible then
+        if not savedMenuPosition then
+            savedMenuPosition = mainFrame.Position
+        end
+        
+        mainFrame.Position = islandPos
+        mainFrame.GroupTransparency = 1
+        if menuAnimateScale then
+            menuAnimateScale.Scale = 0.1
+        end
+        mainFrame.Visible = true
+        isMenuTweening = true
+        
+        local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        
+        TweenService:Create(mainFrame, tweenInfo, {
+            Position = savedMenuPosition,
+            GroupTransparency = 0
+        }):Play()
+        
+        if menuAnimateScale then
+            local scaleTween = TweenService:Create(menuAnimateScale, tweenInfo, {
+                Scale = 1.0
+            })
+            scaleTween:Play()
+            scaleTween.Completed:Connect(function()
+                isMenuTweening = false
+            end)
+        else
+            task.delay(0.25, function()
+                isMenuTweening = false
+            end)
+        end
+    else
+        savedMenuPosition = mainFrame.Position
+        isMenuTweening = true
+        
+        local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        
+        TweenService:Create(mainFrame, tweenInfo, {
+            Position = islandPos,
+            GroupTransparency = 1
+        }):Play()
+        
+        if menuAnimateScale then
+            local scaleTween = TweenService:Create(menuAnimateScale, tweenInfo, {
+                Scale = 0.1
+            })
+            scaleTween:Play()
+            scaleTween.Completed:Connect(function()
+                mainFrame.Visible = false
+                mainFrame.GroupTransparency = 0
+                mainFrame.Position = savedMenuPosition
+                menuAnimateScale.Scale = 1.0
+                isMenuTweening = false
+            end)
+        else
+            task.delay(0.2, function()
+                mainFrame.Visible = false
+                mainFrame.GroupTransparency = 0
+                mainFrame.Position = savedMenuPosition
+                isMenuTweening = false
+            end)
+        end
+    end
+    
     if islandToggle then
-        islandToggle.Text = mainFrame.Visible and "∧" or "∨"
+        islandToggle.Text = targetVisible and "∧" or "∨"
     end
 end
 
@@ -537,21 +727,28 @@ islandScale = Instance.new("UIScale")
 islandScale.Scale = 1.0
 islandScale.Parent = islandFrame
 
-local islandCorner = Instance.new("UICorner")
+islandCorner = Instance.new("UICorner")
 islandCorner.CornerRadius = UDim.new(0, 4)
 islandCorner.Parent = islandFrame
 
-local islandLayout = Instance.new("UIListLayout")
+statsContainer = Instance.new("Frame")
+statsContainer.Name = "StatsContainer"
+statsContainer.Size = UDim2.new(1, -35, 1, 0)
+statsContainer.BackgroundTransparency = 1
+statsContainer.BorderSizePixel = 0
+statsContainer.Parent = islandFrame
+
+islandLayout = Instance.new("UIListLayout")
 islandLayout.FillDirection = Enum.FillDirection.Horizontal
 islandLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 islandLayout.SortOrder = Enum.SortOrder.LayoutOrder
 islandLayout.Padding = UDim.new(0, 6)
-islandLayout.Parent = islandFrame
+islandLayout.Parent = statsContainer
 
-local islandPadding = Instance.new("UIPadding")
+islandPadding = Instance.new("UIPadding")
 islandPadding.PaddingLeft = UDim.new(0, 10)
-islandPadding.PaddingRight = UDim.new(0, 10)
-islandPadding.Parent = islandFrame
+islandPadding.PaddingRight = UDim.new(0, 0)
+islandPadding.Parent = statsContainer
 
 -- Helper function to create labels for the island
 local function createIslandLabel(text, sizeX, layoutOrder, isAccent)
@@ -562,49 +759,41 @@ local function createIslandLabel(text, sizeX, layoutOrder, isAccent)
     label.TextColor3 = Color3.fromRGB(220, 220, 225)
     label.TextSize = 12
     label.LayoutOrder = layoutOrder
-    label.Parent = islandFrame
+    label.Parent = statsContainer
     registerThemeElement(label, isAccent and "Accent" or "Text")
     registerFontElement(label, "Bold")
     return label
 end
 
-local islandTitle = createIslandLabel("BurLix HUB", 65, 1, true)
+islandTitle = createIslandLabel("BurLix HUB", 65, 1, true)
 
 -- Vertical Separator on Island
-local islandSeparator = Instance.new("Frame")
+islandSeparator = Instance.new("Frame")
 islandSeparator.Name = "Separator"
 islandSeparator.Size = UDim2.new(0, 1, 0, 18)
 islandSeparator.BackgroundColor3 = Color3.fromRGB(80, 80, 85)
 islandSeparator.BorderSizePixel = 0
 islandSeparator.LayoutOrder = 2
-islandSeparator.Parent = islandFrame
+islandSeparator.Parent = statsContainer
 registerThemeElement(islandSeparator, "Header")
 
 islandFPS = createIslandLabel("FPS: --", 50, 3)
 islandPing = createIslandLabel("Ping: --", 60, 4)
 
--- Flexible spacer to push the toggle button to the right
-local islandSpacer = Instance.new("Frame")
-islandSpacer.Name = "Spacer"
-islandSpacer.Size = UDim2.new(1, -236, 1, 0)  -- fills remaining horizontal space
-islandSpacer.BackgroundTransparency = 1
-islandSpacer.BorderSizePixel = 0
-islandSpacer.LayoutOrder = 5
-islandSpacer.Parent = islandFrame
-
 -- Set initial visibility from state
-islandFrame.Visible = islandVisible
+islandFrame.Visible = false
 islandFPS.Visible = fpsVisible
 islandPing.Visible = pingVisible
 
--- Toggle Button on Island (Square arrow toggle)
+-- Toggle Button on Island (Square arrow toggle, absolutely positioned)
 islandToggle = Instance.new("TextButton")
 islandToggle.Size = UDim2.new(0, 25, 0, 25)
+islandToggle.AnchorPoint = Vector2.new(0.5, 0.5)
+islandToggle.Position = UDim2.new(1, -18, 0.5, 0) -- Positioned on the right edge, perfectly centered vertically
 islandToggle.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 islandToggle.Text = mainFrame.Visible and "∧" or "∨"
 islandToggle.TextColor3 = Color3.fromRGB(240, 240, 245)
 islandToggle.TextSize = 14
-islandToggle.LayoutOrder = 6
 islandToggle.Parent = islandFrame
 registerFontElement(islandToggle, "Bold")
 registerThemeElement(islandToggle, "Card")
@@ -626,17 +815,27 @@ titleBar.BorderSizePixel = 0
 titleBar.Parent = menuContainer
 registerThemeElement(titleBar, "Header")
 
-local titleCorner = Instance.new("UICorner")
+titleCorner = Instance.new("UICorner")
 titleCorner.CornerRadius = UDim.new(0, 4)
 titleCorner.Parent = titleBar
 
+-- deepDarkLogo = Instance.new("ImageLabel")
+-- deepDarkLogo.Name = "DeepDarkLogo"
+-- deepDarkLogo.Size = UDim2.new(0, 26, 0, 26)
+-- deepDarkLogo.Position = UDim2.new(0, 15, 0.5, 0)
+-- deepDarkLogo.AnchorPoint = Vector2.new(0, 0.5)
+-- deepDarkLogo.BackgroundTransparency = 1
+-- deepDarkLogo.Image = "rbxthumb://type=Asset&id=3116499937&w=420&h=420"
+-- deepDarkLogo.Visible = false
+-- deepDarkLogo.Parent = titleBar
+
 -- Title Text
-local titleText = Instance.new("TextLabel")
+titleText = Instance.new("TextLabel")
 titleText.Name = "TitleText"
-titleText.Size = UDim2.new(1, -60, 1, 0)
+titleText.Size = UDim2.new(1, -90, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "BurLix HUB v1.8.6"
+titleText.Text = "BurLix HUB v2.2.2"
 titleText.TextColor3 = Color3.fromRGB(240, 240, 245)
 titleText.TextSize = 18
 titleText.TextXAlignment = Enum.TextXAlignment.Left
@@ -645,7 +844,7 @@ registerThemeElement(titleText, "Text")
 registerFontElement(titleText, "Bold")
 
 -- Title Bar Separator Line
-local titleSeparator = Instance.new("Frame")
+titleSeparator = Instance.new("Frame")
 titleSeparator.Name = "Separator"
 titleSeparator.Size = UDim2.new(1, 0, 0, 1)
 titleSeparator.Position = UDim2.new(0, 0, 0, 44)
@@ -654,24 +853,37 @@ titleSeparator.BorderSizePixel = 0
 titleSeparator.Parent = titleBar
 registerThemeElement(titleSeparator, "Header")
 
--- Settings Button (⚙) to open menu settings
-local settingsButton = Instance.new("TextButton")
+-- Settings Button (TextButton wrapper for larger click area, small centered gear icon)
+settingsButton = Instance.new("TextButton")
 settingsButton.Name = "SettingsButton"
 settingsButton.Size = UDim2.new(0, 24, 0, 24)
-settingsButton.Position = UDim2.new(1, -64, 0.5, -12)
+settingsButton.Position = UDim2.new(1, -70, 0.5, -12)
 settingsButton.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
-settingsButton.Text = "⚙"
-settingsButton.TextColor3 = Color3.fromRGB(240, 240, 245)
-settingsButton.TextSize = 14
+settingsButton.Text = ""
+settingsButton.AutoButtonColor = false
 settingsButton.Parent = titleBar
-registerFontElement(settingsButton, "Bold")
 
-local settingsCorner = Instance.new("UICorner")
+settingsIcon = Instance.new("ImageLabel")
+settingsIcon.Name = "Icon"
+settingsIcon.Size = UDim2.new(0, 14, 0, 14)
+settingsIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
+settingsIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+settingsIcon.BackgroundTransparency = 1
+settingsIcon.Image = "rbxassetid://10734950309"
+settingsIcon.ImageColor3 = Color3.fromRGB(240, 240, 245)
+settingsIcon.ScaleType = Enum.ScaleType.Fit
+settingsIcon.Parent = settingsButton
+
+settingsCorner = Instance.new("UICorner")
 settingsCorner.CornerRadius = UDim.new(0, 3)
 settingsCorner.Parent = settingsButton
 
 -- Settings Button Hover Styles
 settingsButton.MouseEnter:Connect(function()
+    local icon = settingsButton:FindFirstChild("Icon")
+    if icon then
+        TweenService:Create(icon, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = 45}):Play()
+    end
     if activeTabName ~= "Settings" then
         local colors = themes[currentTheme]
         local hoverColor = colors and Color3.fromRGB(
@@ -683,6 +895,12 @@ settingsButton.MouseEnter:Connect(function()
     end
 end)
 settingsButton.MouseLeave:Connect(function()
+    local icon = settingsButton:FindFirstChild("Icon")
+    if icon then
+        if activeTabName ~= "Settings" then
+            TweenService:Create(icon, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = 0}):Play()
+        end
+    end
     if activeTabName ~= "Settings" then
         local colors = themes[currentTheme]
         TweenService:Create(settingsButton, TweenInfo.new(0.2), {BackgroundColor3 = colors and colors.Header or Color3.fromRGB(50, 50, 55)}):Play()
@@ -701,8 +919,9 @@ closeButton.TextSize = 12
 closeButton.Font = Enum.Font.SourceSansBold
 closeButton.Parent = titleBar
 registerThemeElement(closeButton, "Header")
+registerFontElement(closeButton, "Bold")
 
-local closeCorner = Instance.new("UICorner")
+closeCorner = Instance.new("UICorner")
 closeCorner.CornerRadius = UDim.new(0, 3)
 closeCorner.Parent = closeButton
 
@@ -728,12 +947,12 @@ navPanel.BorderSizePixel = 0
 navPanel.Parent = menuContainer
 registerThemeElement(navPanel, "Sidebar")
 
-local navCorner = Instance.new("UICorner")
+navCorner = Instance.new("UICorner")
 navCorner.CornerRadius = UDim.new(0, 4)
 navCorner.Parent = navPanel
 
 -- Container for navigation buttons to separate them from the profile card
-local navButtonsFrame = Instance.new("Frame")
+navButtonsFrame = Instance.new("Frame")
 navButtonsFrame.Name = "NavButtonsFrame"
 navButtonsFrame.Size = UDim2.new(1, 0, 1, -65)
 navButtonsFrame.BackgroundTransparency = 1
@@ -741,12 +960,12 @@ navButtonsFrame.BorderSizePixel = 0
 navButtonsFrame.Parent = navPanel
 
 -- Left list layout for navigation buttons
-local navList = Instance.new("UIListLayout")
+navList = Instance.new("UIListLayout")
 navList.Padding = UDim.new(0, 8)
 navList.SortOrder = Enum.SortOrder.LayoutOrder
 navList.Parent = navButtonsFrame
 
-local navPadding = Instance.new("UIPadding")
+navPadding = Instance.new("UIPadding")
 navPadding.PaddingTop = UDim.new(0, 10)
 navPadding.PaddingLeft = UDim.new(0, 8)
 navPadding.PaddingRight = UDim.new(0, 8)
@@ -763,7 +982,7 @@ profileCard.ZIndex = 5
 profileCard.Parent = navPanel
 registerThemeElement(profileCard, "Card")
 
-local profileCorner = Instance.new("UICorner")
+profileCorner = Instance.new("UICorner")
 profileCorner.CornerRadius = UDim.new(0, 4)
 profileCorner.Parent = profileCard
 
@@ -771,9 +990,10 @@ local profileStroke = Instance.new("UIStroke")
 profileStroke.Thickness = 1
 profileStroke.Color = Color3.fromRGB(50, 50, 55)
 profileStroke.Parent = profileCard
+registerThemeElement(profileStroke, "Header")
 
 -- Avatar image using Players:GetUserThumbnailAsync
-local avatarImage = Instance.new("ImageLabel")
+avatarImage = Instance.new("ImageLabel")
 avatarImage.Name = "AvatarImage"
 avatarImage.Size = UDim2.new(0, 34, 0, 34)
 avatarImage.Position = UDim2.new(0, 8, 0.5, -17)
@@ -785,22 +1005,14 @@ avatarImage.Selectable = false
 avatarImage.ZIndex = 6
 avatarImage.Parent = profileCard
 
-local avatarCorner = Instance.new("UICorner")
+avatarCorner = Instance.new("UICorner")
 avatarCorner.CornerRadius = UDim.new(1, 0)
 avatarCorner.Parent = avatarImage
 
-task.spawn(function()
-    local avatarImageId = "rbxassetid://0"
-    pcall(function()
-        local thumbnailType = Enum.ThumbnailType.HeadShot
-        local thumbnailSize = Enum.ThumbnailSize.Size48x48
-        avatarImageId = Players:GetUserThumbnailAsync(player.UserId, thumbnailType, thumbnailSize)
-    end)
-    avatarImage.Image = avatarImageId
-end)
+-- Avatar image loading is handled synchronously during the initial loading screen sequence
 
 -- Username Label
-local usernameLabel = Instance.new("TextLabel")
+usernameLabel = Instance.new("TextLabel")
 usernameLabel.Name = "UsernameLabel"
 usernameLabel.Size = UDim2.new(1, -54, 0, 16)
 usernameLabel.Position = UDim2.new(0, 48, 0, 8)
@@ -818,7 +1030,7 @@ registerThemeElement(usernameLabel, "Text")
 registerFontElement(usernameLabel, "Bold")
 
 -- ID Label
-local idLabel = Instance.new("TextLabel")
+idLabel = Instance.new("TextLabel")
 idLabel.Name = "IdLabel"
 idLabel.Size = UDim2.new(1, -54, 0, 12)
 idLabel.Position = UDim2.new(0, 48, 0, 24)
@@ -836,7 +1048,7 @@ registerThemeElement(idLabel, "Text")
 registerFontElement(idLabel, "Regular")
 
 -- Invisible overlay button for 100% reliable click detection
-local profileClickButton = Instance.new("TextButton")
+profileClickButton = Instance.new("TextButton")
 profileClickButton.Name = "ProfileClickButton"
 profileClickButton.Size = UDim2.new(1, 0, 1, 0)
 profileClickButton.BackgroundTransparency = 1
@@ -888,6 +1100,11 @@ local function showTab(tabName)
     for name, data in pairs(tabs) do
         if name == tabName then
             data.Frame.Visible = true
+            data.Frame.Position = UDim2.new(0, 10, 0, 25)
+            local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+            TweenService:Create(data.Frame, tweenInfo, {
+                Position = UDim2.new(0, 10, 0, 10)
+            }):Play()
         else
             data.Frame.Visible = false
         end
@@ -1038,6 +1255,7 @@ local function createSlider(tabFrame, name, minVal, maxVal, defaultVal, layoutOr
     label.Font = Enum.Font.SourceSansBold
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = row
+    registerFontElement(label, "Bold")
     
     local sliderBar = Instance.new("Frame")
     sliderBar.Size = UDim2.new(1, -20, 0, 8)
@@ -1138,7 +1356,7 @@ local function createToggle(tabFrame, name, defaultVal, layoutOrder, onChange, o
     rowCorner.Parent = row
     
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -60, 1, 0)
+    label.Size = onRightClick and UDim2.new(1, -165, 1, 0) or UDim2.new(1, -125, 1, 0)
     label.Position = UDim2.new(0, 10, 0, 0)
     label.BackgroundTransparency = 1
     label.Text = name
@@ -1147,6 +1365,7 @@ local function createToggle(tabFrame, name, defaultVal, layoutOrder, onChange, o
     label.Font = Enum.Font.SourceSansBold
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = row
+    registerFontElement(label, "Bold")
     
     -- Make toggleButton a Frame, so clicks on it fall through to the row TextButton
     local toggleButton = Instance.new("Frame")
@@ -1182,8 +1401,8 @@ local function createToggle(tabFrame, name, defaultVal, layoutOrder, onChange, o
     table.insert(toggleUpdaters, updateToggleColor)
     updateToggleColor()
     
-    -- Click logic for the entire row (MouseButton1Click for toggle)
-    table.insert(connections, row.MouseButton1Click:Connect(function()
+    -- Reusable toggle action function
+    local function toggleState()
         enabled = not enabled
         local colors = themes[currentTheme]
         local targetColor = colors and (enabled and colors.Accent or colors.Sidebar) or (enabled and Color3.fromRGB(80, 80, 250) or Color3.fromRGB(35, 35, 40))
@@ -1193,7 +1412,10 @@ local function createToggle(tabFrame, name, defaultVal, layoutOrder, onChange, o
         TweenService:Create(knob, TweenInfo.new(0.2), {Position = targetPos}):Play()
         
         onChange(enabled)
-    end))
+    end
+    
+    -- Click logic for the entire row (MouseButton1Click for toggle)
+    table.insert(connections, row.MouseButton1Click:Connect(toggleState))
     
     -- Hover effect for the entire row (darken slightly on hover)
     table.insert(connections, row.MouseEnter:Connect(function()
@@ -1215,8 +1437,110 @@ local function createToggle(tabFrame, name, defaultVal, layoutOrder, onChange, o
         end
     end))
     
+    -- Keybind button for this toggle
+    local currentBind = nil
+    local bindButton = Instance.new("TextButton")
+    bindButton.Name = name .. "Keybind"
+    bindButton.Size = UDim2.new(0, 45, 0, 20)
+    bindButton.Position = UDim2.new(1, -110, 0.5, -10)
+    bindButton.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    bindButton.BorderSizePixel = 0
+    bindButton.Text = "Bind"
+    bindButton.TextColor3 = Color3.fromRGB(150, 150, 155)
+    bindButton.TextSize = 10
+    bindButton.Font = Enum.Font.Code
+    bindButton.Parent = row
+    registerThemeElement(bindButton, "Background")
+    registerThemeElement(bindButton, "Text")
+    
+    local bindCorner = Instance.new("UICorner")
+    bindCorner.CornerRadius = UDim.new(0, 3)
+    bindCorner.Parent = bindButton
+    
+    local bindStroke = Instance.new("UIStroke")
+    bindStroke.Thickness = 1
+    bindStroke.Color = Color3.fromRGB(55, 55, 60)
+    bindStroke.Parent = bindButton
+    registerThemeElement(bindStroke, "Header")
+    
+    local listeningForThis = false
+    table.insert(connections, bindButton.MouseButton1Click:Connect(function()
+        if listeningForKeybind then return end
+        listeningForKeybind = true
+        listeningForThis = true
+        bindButton.Text = "..."
+        local colors = themes[currentTheme]
+        bindStroke.Color = colors and colors.Accent or Color3.fromRGB(80, 80, 250)
+        
+        local tempConn
+        tempConn = UserInputService.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                local pressedKey = input.KeyCode
+                if pressedKey == Enum.KeyCode.Escape or pressedKey == Enum.KeyCode.Backspace then
+                    currentBind = nil
+                    bindButton.Text = "Bind"
+                    listeningForKeybind = false
+                    listeningForThis = false
+                    bindStroke.Color = Color3.fromRGB(180, 50, 50)
+                    task.delay(0.5, function()
+                        local cols = themes[currentTheme]
+                        bindStroke.Color = cols and cols.Header or Color3.fromRGB(55, 55, 60)
+                    end)
+                    tempConn:Disconnect()
+                    for idx, c in ipairs(connections) do
+                        if c == tempConn then
+                            table.remove(connections, idx)
+                            break
+                        end
+                    end
+                elseif pressedKey ~= Enum.KeyCode.Unknown then
+                    currentBind = pressedKey
+                    bindButton.Text = pressedKey.Name
+                    listeningForKeybind = false
+                    listeningForThis = false
+                    bindStroke.Color = Color3.fromRGB(50, 180, 50)
+                    task.delay(0.5, function()
+                        local cols = themes[currentTheme]
+                        bindStroke.Color = cols and cols.Header or Color3.fromRGB(55, 55, 60)
+                    end)
+                    tempConn:Disconnect()
+                    for idx, c in ipairs(connections) do
+                        if c == tempConn then
+                            table.remove(connections, idx)
+                            break
+                        end
+                    end
+                end
+            end
+        end)
+        table.insert(connections, tempConn)
+    end))
+    
+    table.insert(connections, UserInputService.InputBegan:Connect(function(input)
+        if listeningForKeybind then return end
+        if currentBind and input.KeyCode == currentBind then
+            toggleState()
+        end
+    end))
+    
     -- Right click logic for the entire row (MouseButton2Click to open settings)
     if onRightClick then
+        local rmbNote = Instance.new("TextLabel")
+        rmbNote.Name = "RMBNote"
+        rmbNote.Size = UDim2.new(0, 30, 1, 0)
+        rmbNote.Position = UDim2.new(1, -155, 0, 0)
+        rmbNote.BackgroundTransparency = 1
+        rmbNote.Text = "ПКМ"
+        rmbNote.TextColor3 = Color3.fromRGB(220, 220, 225)
+        rmbNote.TextTransparency = 0.8
+        rmbNote.TextSize = 10
+        rmbNote.TextXAlignment = Enum.TextXAlignment.Right
+        rmbNote.Active = false
+        rmbNote.Selectable = false
+        rmbNote.Parent = row
+        registerFontElement(rmbNote, "Regular")
+        registerThemeElement(rmbNote, "Text")
+
         table.insert(connections, row.MouseButton2Click:Connect(function()
             onRightClick()
         end))
@@ -1254,9 +1578,11 @@ local function toggleSettingsPanel(panel, targetHeight)
 end
 
 -- Helper Function to Create Settings Panel with Presets, HEX Input and custom sliders
+-- Helper Function to Create Settings Panel with Presets, HEX Input and custom sliders
 local function createSettingsPanel(tabFrame, layoutOrder, defaultColor, onColorChange, customSliders)
     local rowHeight = 24
-    local panelHeight = (1 + #customSliders) * rowHeight + 10
+    local hasColor = (defaultColor ~= nil and onColorChange ~= nil)
+    local panelHeight = (#customSliders + (hasColor and 1 or 0)) * (rowHeight + 4) + 6
     
     local panel = Instance.new("Frame")
     panel.Name = "SettingsPanel"
@@ -1282,146 +1608,20 @@ local function createSettingsPanel(tabFrame, layoutOrder, defaultColor, onColorC
     
     local listLayout = Instance.new("UIListLayout")
     listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    listLayout.Padding = UDim.new(0, 2)
+    listLayout.Padding = UDim.new(0, 4)
     listLayout.Parent = panel
-    
-    -- Color Row (Presets + HEX TextBox)
-    local colorRow = Instance.new("Frame")
-    colorRow.Size = UDim2.new(1, 0, 0, rowHeight)
-    colorRow.BackgroundTransparency = 1
-    colorRow.LayoutOrder = 1
-    colorRow.Parent = panel
-    
-    local colorLabel = Instance.new("TextLabel")
-    colorLabel.Size = UDim2.new(0, 45, 1, 0)
-    colorLabel.BackgroundTransparency = 1
-    colorLabel.Text = "Color:"
-    colorLabel.TextColor3 = Color3.fromRGB(180, 180, 185)
-    colorLabel.TextSize = 11
-    colorLabel.Font = Enum.Font.SourceSansBold
-    colorLabel.TextXAlignment = Enum.TextXAlignment.Left
-    colorLabel.Parent = colorRow
-    registerThemeElement(colorLabel, "Text")
-    
-    -- HEX TextBox
-    local hexInput = Instance.new("TextBox")
-    hexInput.Size = UDim2.new(0, 65, 0, 18)
-    hexInput.Position = UDim2.new(1, -65, 0.5, -9)
-    hexInput.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-    hexInput.BorderSizePixel = 0
-    hexInput.Text = colorToHex(defaultColor)
-    hexInput.TextColor3 = Color3.fromRGB(220, 220, 225)
-    hexInput.TextSize = 10
-    hexInput.Font = Enum.Font.Code
-    hexInput.ClearTextOnFocus = false
-    hexInput.Parent = colorRow
-    registerThemeElement(hexInput, "Background")
-    registerThemeElement(hexInput, "Text")
-    
-    local hexCorner = Instance.new("UICorner")
-    hexCorner.CornerRadius = UDim.new(0, 2)
-    hexCorner.Parent = hexInput
-    
-    local hexStroke = Instance.new("UIStroke")
-    hexStroke.Thickness = 1
-    hexStroke.Color = Color3.fromRGB(50, 50, 55)
-    hexStroke.Parent = hexInput
-    
-    -- Presets Container
-    local presetsContainer = Instance.new("Frame")
-    presetsContainer.Size = UDim2.new(1, -120, 1, 0)
-    presetsContainer.Position = UDim2.new(0, 45, 0, 0)
-    presetsContainer.BackgroundTransparency = 1
-    presetsContainer.Parent = colorRow
-    
-    local presetsLayout = Instance.new("UIListLayout")
-    presetsLayout.FillDirection = Enum.FillDirection.Horizontal
-    presetsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-    presetsLayout.Padding = UDim.new(0, 4)
-    presetsLayout.Parent = presetsContainer
-    
-    local presets = {
-        Color3.fromRGB(80, 80, 250),   -- Blue
-        Color3.fromRGB(250, 80, 80),   -- Red
-        Color3.fromRGB(80, 250, 80),   -- Green
-        Color3.fromRGB(250, 250, 80),  -- Yellow
-        Color3.fromRGB(255, 255, 255), -- White
-        Color3.fromRGB(250, 80, 250),  -- Purple
-        Color3.fromRGB(250, 150, 50),  -- Orange
-        Color3.fromRGB(80, 250, 250),  -- Cyan
-        Color3.fromRGB(250, 120, 170), -- Pink
-        Color3.fromRGB(150, 250, 80),  -- Lime
-        Color3.fromRGB(0, 0, 0),       -- Black
-        Color3.fromRGB(150, 150, 150)  -- Grey
-    }
-    
-    local function selectColor(color, skipHexUpdate)
-        onColorChange(color)
-        if not skipHexUpdate then
-            hexInput.Text = colorToHex(color)
-        end
-        -- Highlight active preset button
-        for _, child in ipairs(presetsContainer:GetChildren()) do
-            if child:IsA("TextButton") then
-                local stroke = child:FindFirstChild("UIStroke")
-                if stroke then
-                    local isMatch = (child.BackgroundColor3.R == color.R and child.BackgroundColor3.G == color.G and child.BackgroundColor3.B == color.B)
-                    stroke.Color = isMatch and Color3.fromRGB(240, 240, 245) or Color3.fromRGB(35, 35, 40)
-                end
-            end
-        end
-    end
-    
-    for _, color in ipairs(presets) do
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, 12, 0, 12)
-        btn.BackgroundColor3 = color
-        btn.Text = ""
-        btn.Parent = presetsContainer
-        
-        local btnCorner = Instance.new("UICorner")
-        btnCorner.CornerRadius = UDim.new(1, 0)
-        btnCorner.Parent = btn
-        
-        local stroke = Instance.new("UIStroke")
-        stroke.Thickness = 1.5
-        stroke.Color = Color3.fromRGB(35, 35, 40)
-        stroke.Parent = btn
-        
-        table.insert(connections, btn.MouseButton1Click:Connect(function()
-            selectColor(color)
-        end))
-    end
-    
-    -- Handle HEX input updates
-    table.insert(connections, hexInput.FocusLost:Connect(function(enterPressed)
-        local inputColor = hexToColor(hexInput.Text)
-        if inputColor then
-            selectColor(inputColor, true)
-            hexStroke.Color = Color3.fromRGB(50, 180, 50) -- Green feedback for success
-            task.delay(0.5, function()
-                hexStroke.Color = Color3.fromRGB(50, 50, 55)
-            end)
-        else
-            -- Revert to current color on invalid input
-            hexInput.Text = hexInput.Text -- triggers redraw of text
-            hexStroke.Color = Color3.fromRGB(180, 50, 50) -- Red feedback for error
-            task.delay(0.5, function()
-                hexStroke.Color = Color3.fromRGB(50, 50, 55)
-            end)
-        end
-    end))
     
     -- Helper to build a compact slider inside the panel
     local function buildCompactSlider(sliderName, minVal, maxVal, defaultVal, onChange, layoutOrder)
         local sliderRow = Instance.new("Frame")
         sliderRow.Size = UDim2.new(1, 0, 0, rowHeight)
         sliderRow.BackgroundTransparency = 1
+        sliderRow.BorderSizePixel = 0
         sliderRow.LayoutOrder = layoutOrder
         sliderRow.Parent = panel
         
         local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(0, 90, 1, 0)
+        label.Size = UDim2.new(0, 120, 1, 0)
         label.BackgroundTransparency = 1
         label.Text = sliderName .. ": " .. tostring(defaultVal)
         label.TextColor3 = Color3.fromRGB(180, 180, 185)
@@ -1430,13 +1630,28 @@ local function createSettingsPanel(tabFrame, layoutOrder, defaultColor, onColorC
         label.TextXAlignment = Enum.TextXAlignment.Left
         label.Parent = sliderRow
         registerThemeElement(label, "Text")
+        registerFontElement(label, "Bold")
+        
+        local sliderField = Instance.new("Frame")
+        sliderField.Name = "SliderField"
+        sliderField.Size = UDim2.new(1, -135, 0, 18)
+        sliderField.Position = UDim2.new(0, 125, 0.5, -9)
+        sliderField.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+        sliderField.BackgroundTransparency = 0.38
+        sliderField.BorderSizePixel = 0
+        sliderField.Parent = sliderRow
+        registerThemeElement(sliderField, "Background")
+        
+        local fieldCorner = Instance.new("UICorner")
+        fieldCorner.CornerRadius = UDim.new(0, 6)
+        fieldCorner.Parent = sliderField
         
         local sliderBar = Instance.new("Frame")
-        sliderBar.Size = UDim2.new(1, -95, 0, 4)
-        sliderBar.Position = UDim2.new(0, 95, 0.5, -2)
-        sliderBar.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+        sliderBar.Size = UDim2.new(1, -12, 0, 4)
+        sliderBar.Position = UDim2.new(0, 6, 0.5, -2)
+        sliderBar.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
         sliderBar.BorderSizePixel = 0
-        sliderBar.Parent = sliderRow
+        sliderBar.Parent = sliderField
         registerThemeElement(sliderBar, "Sidebar")
         
         local sliderBarCorner = Instance.new("UICorner")
@@ -1497,7 +1712,7 @@ local function createSettingsPanel(tabFrame, layoutOrder, defaultColor, onColorC
             updateVal(percentage)
         end
         
-        table.insert(connections, sliderBar.InputBegan:Connect(function(input)
+        table.insert(connections, sliderField.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 active = true
                 processInput(input)
@@ -1517,26 +1732,163 @@ local function createSettingsPanel(tabFrame, layoutOrder, defaultColor, onColorC
         end))
     end
     
+    local selectColor
+    
+    if hasColor then
+        -- Color Row (Presets + HEX TextBox)
+        local colorRow = Instance.new("Frame")
+        colorRow.Size = UDim2.new(1, 0, 0, rowHeight)
+        colorRow.BackgroundTransparency = 1
+        colorRow.LayoutOrder = 1
+        colorRow.Parent = panel
+        
+        local colorLabel = Instance.new("TextLabel")
+        colorLabel.Size = UDim2.new(0, 45, 1, 0)
+        colorLabel.BackgroundTransparency = 1
+        colorLabel.Text = "Color:"
+        colorLabel.TextColor3 = Color3.fromRGB(180, 180, 185)
+        colorLabel.TextSize = 11
+        colorLabel.Font = Enum.Font.SourceSansBold
+        colorLabel.TextXAlignment = Enum.TextXAlignment.Left
+        colorLabel.Parent = colorRow
+        registerThemeElement(colorLabel, "Text")
+        registerFontElement(colorLabel, "Bold")
+        
+        -- HEX TextBox
+        local hexInput = Instance.new("TextBox")
+        hexInput.Size = UDim2.new(0, 65, 0, 18)
+        hexInput.Position = UDim2.new(1, -65, 0.5, -9)
+        hexInput.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+        hexInput.BorderSizePixel = 0
+        hexInput.Text = colorToHex(defaultColor)
+        hexInput.TextColor3 = Color3.fromRGB(220, 220, 225)
+        hexInput.TextSize = 10
+        hexInput.Font = Enum.Font.Code
+        hexInput.ClearTextOnFocus = false
+        hexInput.Parent = colorRow
+        registerThemeElement(hexInput, "Background")
+        registerThemeElement(hexInput, "Text")
+        
+        local hexCorner = Instance.new("UICorner")
+        hexCorner.CornerRadius = UDim.new(0, 2)
+        hexCorner.Parent = hexInput
+        
+        local hexStroke = Instance.new("UIStroke")
+        hexStroke.Thickness = 1
+        hexStroke.Color = Color3.fromRGB(50, 50, 55)
+        hexStroke.Parent = hexInput
+        registerThemeElement(hexStroke, "Header")
+        
+        -- Presets Container
+        local presetsContainer = Instance.new("Frame")
+        presetsContainer.Size = UDim2.new(1, -120, 1, 0)
+        presetsContainer.Position = UDim2.new(0, 45, 0, 0)
+        presetsContainer.BackgroundTransparency = 1
+        presetsContainer.Parent = colorRow
+        
+        local presetsLayout = Instance.new("UIListLayout")
+        presetsLayout.FillDirection = Enum.FillDirection.Horizontal
+        presetsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+        presetsLayout.Padding = UDim.new(0, 4)
+        presetsLayout.Parent = presetsContainer
+        
+        local presets = {
+            Color3.fromRGB(80, 80, 250),   -- Blue
+            Color3.fromRGB(250, 80, 80),   -- Red
+            Color3.fromRGB(80, 250, 80),   -- Green
+            Color3.fromRGB(250, 250, 80),  -- Yellow
+            Color3.fromRGB(255, 255, 255), -- White
+            Color3.fromRGB(250, 80, 250),  -- Purple
+            Color3.fromRGB(250, 150, 50),  -- Orange
+            Color3.fromRGB(80, 250, 250),  -- Cyan
+            Color3.fromRGB(250, 120, 170), -- Pink
+            Color3.fromRGB(150, 250, 80),  -- Lime
+            Color3.fromRGB(0, 0, 0),       -- Black
+            Color3.fromRGB(150, 150, 150)  -- Grey
+        }
+        
+        selectColor = function(color, skipHexUpdate)
+            onColorChange(color)
+            if not skipHexUpdate then
+                hexInput.Text = colorToHex(color)
+            end
+            -- Highlight active preset button
+            for _, child in ipairs(presetsContainer:GetChildren()) do
+                if child:IsA("TextButton") then
+                    local stroke = child:FindFirstChild("UIStroke")
+                    if stroke then
+                        local isMatch = (child.BackgroundColor3.R == color.R and child.BackgroundColor3.G == color.G and child.BackgroundColor3.B == color.B)
+                        stroke.Color = isMatch and Color3.fromRGB(240, 240, 245) or Color3.fromRGB(35, 35, 40)
+                    end
+                end
+            end
+        end
+        
+        for _, color in ipairs(presets) do
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(0, 12, 0, 12)
+            btn.BackgroundColor3 = color
+            btn.Text = ""
+            btn.Parent = presetsContainer
+            
+            local btnCorner = Instance.new("UICorner")
+            btnCorner.CornerRadius = UDim.new(1, 0)
+            btnCorner.Parent = btn
+            
+            local stroke = Instance.new("UIStroke")
+            stroke.Thickness = 1.5
+            stroke.Color = Color3.fromRGB(35, 35, 40)
+            stroke.Parent = btn
+            
+            table.insert(connections, btn.MouseButton1Click:Connect(function()
+                selectColor(color)
+            end))
+        end
+        
+        -- Handle HEX input updates
+        table.insert(connections, hexInput.FocusLost:Connect(function(enterPressed)
+            local inputColor = hexToColor(hexInput.Text)
+            if inputColor then
+                selectColor(inputColor, true)
+                hexStroke.Color = Color3.fromRGB(50, 180, 50) -- Green feedback for success
+                task.delay(0.5, function()
+                    local cols = themes[currentTheme]
+                    hexStroke.Color = cols and cols.Header or Color3.fromRGB(50, 50, 55)
+                end)
+            else
+                -- Revert to current color on invalid input
+                hexInput.Text = hexInput.Text -- triggers redraw of text
+                hexStroke.Color = Color3.fromRGB(180, 50, 50) -- Red feedback for error
+                task.delay(0.5, function()
+                    local cols = themes[currentTheme]
+                    hexStroke.Color = cols and cols.Header or Color3.fromRGB(50, 50, 55)
+                end)
+            end
+        end))
+    end
+    
     -- Add custom sliders
     for idx, sliderConf in ipairs(customSliders) do
-        buildCompactSlider(sliderConf.name, sliderConf.min, sliderConf.max, sliderConf.default, sliderConf.onChange, idx + 1)
+        buildCompactSlider(sliderConf.name, sliderConf.min, sliderConf.max, sliderConf.default, sliderConf.onChange, idx + (hasColor and 1 or 0))
     end
     
     -- Initial select to match color and outline stroke active state
-    selectColor(defaultColor)
+    if hasColor and selectColor then
+        selectColor(defaultColor)
+    end
     
     return panel, panelHeight
 end
 
 -- Create Tabs (Decreased Authors tab canvas height since Reset buttons are removed)
-local playerTab = createTab("Player", 1, 200)
-local worldTab = createTab("World", 2, 200)
-local authorsTab = createTab("Authors", 3, 520)
-local visualsTab = createTab("Visuals", 4, 850)
-local settingsTab = createTab("Settings", 5, 650)
+playerTab = createTab("Player", 1, 200)
+worldTab = createTab("World", 2, 200)
+authorsTab = createTab("Authors", 3, 520)
+visualsTab = createTab("Visuals", 4, 850)
+settingsTab = createTab("Settings", 5, 650)
 
 -- Settings Tab Content
-local settingsTitle = Instance.new("TextLabel")
+settingsTitle = Instance.new("TextLabel")
 settingsTitle.Name = "SettingsTitle"
 settingsTitle.Size = UDim2.new(1, -20, 0, 30)
 settingsTitle.Position = UDim2.new(0, 10, 0, 10)
@@ -1549,22 +1901,23 @@ settingsTitle.TextXAlignment = Enum.TextXAlignment.Left
 settingsTitle.LayoutOrder = 0
 settingsTitle.Parent = settingsTab
 registerThemeElement(settingsTitle, "Text")
+registerFontElement(settingsTitle, "Bold")
 
-local islandVisibleToggle = createToggle(settingsTab, "Show Top Island", true, 1, function(state)
+islandVisibleToggle = createToggle(settingsTab, "Show Top Island", true, 1, function(state)
     islandVisible = state
     if islandFrame then
         islandFrame.Visible = state
     end
 end)
 
-local fpsVisibleToggle = createToggle(settingsTab, "Show FPS Counter", true, 2, function(state)
+fpsVisibleToggle = createToggle(settingsTab, "Show FPS Counter", true, 2, function(state)
     fpsVisible = state
     if islandFPS then
         islandFPS.Visible = state
     end
 end)
 
-local pingVisibleToggle = createToggle(settingsTab, "Show Ping Counter", true, 3, function(state)
+pingVisibleToggle = createToggle(settingsTab, "Show Ping Counter", true, 3, function(state)
     pingVisible = state
     if islandPing then
         islandPing.Visible = state
@@ -1572,9 +1925,9 @@ local pingVisibleToggle = createToggle(settingsTab, "Show Ping Counter", true, 3
 end)
 
 -- Keybind Row
-local keybindRow = createRow(settingsTab, "KeybindRow", 45, 4)
+keybindRow = createRow(settingsTab, "KeybindRow", 45, 4)
 
-local keybindLabel = Instance.new("TextLabel")
+keybindLabel = Instance.new("TextLabel")
 keybindLabel.Size = UDim2.new(1, -100, 1, 0)
 keybindLabel.Position = UDim2.new(0, 10, 0, 0)
 keybindLabel.BackgroundTransparency = 1
@@ -1585,65 +1938,87 @@ keybindLabel.Font = Enum.Font.SourceSansBold
 keybindLabel.TextXAlignment = Enum.TextXAlignment.Left
 keybindLabel.Parent = keybindRow
 registerThemeElement(keybindLabel, "Text")
+registerFontElement(keybindLabel, "Bold")
 
-local keybindInput = Instance.new("TextBox")
+keybindInput = Instance.new("TextButton")
 keybindInput.Size = UDim2.new(0, 80, 0, 25)
 keybindInput.Position = UDim2.new(1, -90, 0.5, -12)
 keybindInput.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 keybindInput.BorderSizePixel = 0
-keybindInput.Text = "P"
+keybindInput.Text = menuKeybind.Name
 keybindInput.TextColor3 = Color3.fromRGB(240, 240, 245)
 keybindInput.TextSize = 12
 keybindInput.Font = Enum.Font.Code
-keybindInput.ClearTextOnFocus = false
 keybindInput.Parent = keybindRow
 registerThemeElement(keybindInput, "Background")
 registerThemeElement(keybindInput, "Text")
 
-local keybindCorner = Instance.new("UICorner")
+keybindCorner = Instance.new("UICorner")
 keybindCorner.CornerRadius = UDim.new(0, 3)
 keybindCorner.Parent = keybindInput
 
-local keybindStroke = Instance.new("UIStroke")
+keybindStroke = Instance.new("UIStroke")
 keybindStroke.Thickness = 1
 keybindStroke.Color = Color3.fromRGB(55, 55, 60)
 keybindStroke.Parent = keybindInput
+registerThemeElement(keybindStroke, "Header")
 
-table.insert(connections, keybindInput.FocusLost:Connect(function(enterPressed)
-    local text = keybindInput.Text:upper():gsub("%s+", "")
-    if #text == 1 then
-        local code = Enum.KeyCode[text]
-        if code then
-            menuKeybind = code
-            keybindInput.Text = text
-            keybindStroke.Color = Color3.fromRGB(50, 180, 50)
-            task.delay(0.5, function()
-                keybindStroke.Color = Color3.fromRGB(55, 55, 60)
-            end)
-            return
+local listeningForThis = false
+table.insert(connections, keybindInput.MouseButton1Click:Connect(function()
+    if listeningForKeybind then return end
+    listeningForKeybind = true
+    keybindInput.Text = "..."
+    keybindStroke.Color = Color3.fromRGB(80, 80, 250)
+    
+    local tempConnection
+    tempConnection = UserInputService.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            local pressedKey = input.KeyCode
+            if pressedKey == Enum.KeyCode.Escape then
+                keybindInput.Text = menuKeybind.Name
+                listeningForKeybind = false
+                keybindStroke.Color = Color3.fromRGB(180, 50, 50)
+                task.delay(0.5, function()
+                    local cols = themes[currentTheme]
+                    keybindStroke.Color = cols and cols.Header or Color3.fromRGB(55, 55, 60)
+                end)
+                tempConnection:Disconnect()
+                for i, conn in ipairs(connections) do
+                    if conn == tempConnection then
+                        table.remove(connections, i)
+                        break
+                    end
+                end
+            elseif pressedKey ~= Enum.KeyCode.Unknown then
+                menuKeybind = pressedKey
+                keybindInput.Text = pressedKey.Name
+                listeningForKeybind = false
+                keybindStroke.Color = Color3.fromRGB(50, 180, 50)
+                task.delay(0.5, function()
+                    local cols = themes[currentTheme]
+                    keybindStroke.Color = cols and cols.Header or Color3.fromRGB(55, 55, 60)
+                end)
+                tempConnection:Disconnect()
+                for i, conn in ipairs(connections) do
+                    if conn == tempConnection then
+                        table.remove(connections, i)
+                        break
+                    end
+                end
+            end
         end
-    end
-    -- Revert
-    for _, code in ipairs(Enum.KeyCode:GetEnumItems()) do
-        if code == menuKeybind then
-            keybindInput.Text = code.Name
-            break
-        end
-    end
-    keybindStroke.Color = Color3.fromRGB(180, 50, 50)
-    task.delay(0.5, function()
-        keybindStroke.Color = Color3.fromRGB(55, 55, 60)
     end)
+    table.insert(connections, tempConnection)
 end))
 
 -- Theme Selector Row
-local themeRow = createRow(settingsTab, "ThemeRow", 105, 5)
+themeRow = createRow(settingsTab, "ThemeRow", 135, 5)
 
-local themeLabel = Instance.new("TextLabel")
+themeLabel = Instance.new("TextLabel")
 themeLabel.Size = UDim2.new(1, -20, 0, 20)
 themeLabel.Position = UDim2.new(0, 10, 0, 6)
 themeLabel.BackgroundTransparency = 1
-themeLabel.Text = "Menu Theme"
+themeLabel.Text = "Menu Theme: " .. currentTheme
 themeLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 themeLabel.TextSize = 14
 themeLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -1651,42 +2026,99 @@ themeLabel.Parent = themeRow
 registerThemeElement(themeLabel, "Text")
 registerFontElement(themeLabel, "Bold")
 
-local themeContainer = Instance.new("Frame")
+themeContainer = Instance.new("Frame")
 themeContainer.Size = UDim2.new(1, -20, 1, -34)
 themeContainer.Position = UDim2.new(0, 10, 0, 28)
 themeContainer.BackgroundTransparency = 1
 themeContainer.BorderSizePixel = 0
 themeContainer.Parent = themeRow
 
-local themeLayout = Instance.new("UIGridLayout")
-themeLayout.CellSize = UDim2.new(0, 52, 0, 20)
-themeLayout.CellPadding = UDim2.new(0, 4, 0, 4)
+themeLayout = Instance.new("UIGridLayout")
+themeLayout.CellSize = UDim2.new(0, 64, 0, 28)
+themeLayout.CellPadding = UDim2.new(0, 10, 0, 8)
 themeLayout.SortOrder = Enum.SortOrder.LayoutOrder
 themeLayout.Parent = themeContainer
 
-local themeNames = {"Dark", "Purple", "Aqua", "Sakura", "Cyberpunk", "Forest", "Nordic", "Sunset", "Midnight", "Emerald", "Nebula", "Monochrome"}
-for idx, name in ipairs(themeNames) do
+local function createThemeCell(idx, name)
+    local isNewTheme = (name == "Light" or name == "DeepDark")
+    
+    local cell = Instance.new("Frame")
+    cell.LayoutOrder = idx
+    cell.Parent = themeContainer
+    cell.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    cell.BorderSizePixel = 0
+    registerThemeElement(cell, "Sidebar")
+    
+    local cellCorner = Instance.new("UICorner")
+    cellCorner.CornerRadius = UDim.new(0, 4)
+    cellCorner.Parent = cell
+    
+    local cellStroke = Instance.new("UIStroke")
+    cellStroke.Thickness = 1
+    cellStroke.Parent = cell
+    
+    if isNewTheme then
+        local badge = Instance.new("TextLabel")
+        badge.Name = "NewBadge"
+        badge.Size = UDim2.new(0, 30, 0, 9)
+        badge.Position = UDim2.new(1, -29, 0, -4)
+        badge.BackgroundColor3 = Color3.fromRGB(250, 160, 50) -- Gold/Orange
+        badge.Text = "Furry"
+        badge.TextColor3 = Color3.fromRGB(255, 255, 255)
+        badge.TextSize = 7
+        badge.Font = Enum.Font.SourceSansBold
+        badge.ZIndex = 10
+        badge.Parent = cell
+        registerFontElement(badge, "Bold")
+        
+        local badgeCorner = Instance.new("UICorner")
+        badgeCorner.CornerRadius = UDim.new(0, 2)
+        badgeCorner.Parent = badge
+    end
+    
     local btn = Instance.new("TextButton")
-    btn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-    btn.Text = name
-    btn.TextColor3 = Color3.fromRGB(220, 220, 225)
-    btn.TextSize = 10
-    btn.LayoutOrder = idx
-    btn.Parent = themeContainer
-    registerFontElement(btn, "Bold")
+    btn.Size = UDim2.new(0, 44, 0, 16)
+    btn.Position = UDim2.new(0.5, -22, 0.5, -8)
+    btn.Text = ""
+    btn.BackgroundTransparency = 1
+    btn.Parent = cell
+    btn.ClipsDescendants = true
     
     local btnCorner = Instance.new("UICorner")
     btnCorner.CornerRadius = UDim.new(0, 3)
     btnCorner.Parent = btn
     
+    local themeData = themes[name]
+    local leftColor = themeData.Background
+    local rightColor = themeData.Accent
+    
+    local leftHalf = Instance.new("Frame")
+    leftHalf.Size = UDim2.new(0.5, -1, 1, 0)
+    leftHalf.Position = UDim2.new(0, 0, 0, 0)
+    leftHalf.BackgroundColor3 = leftColor
+    leftHalf.BorderSizePixel = 0
+    leftHalf.Parent = btn
+    
+    local rightHalf = Instance.new("Frame")
+    rightHalf.Size = UDim2.new(0.5, -1, 1, 0)
+    rightHalf.Position = UDim2.new(0.5, 1, 0, 0)
+    rightHalf.BackgroundColor3 = rightColor
+    rightHalf.BorderSizePixel = 0
+    rightHalf.Parent = btn
+    
     local function updateBtnStyle()
         local colors = themes[currentTheme]
         if currentTheme == name then
-            btn.BackgroundColor3 = colors.Accent
-            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            cellStroke.Color = Color3.fromRGB(240, 240, 245)
+            cellStroke.Thickness = 2
         else
-            btn.BackgroundColor3 = colors.Sidebar
-            btn.TextColor3 = colors.Text
+            if isNewTheme then
+                cellStroke.Color = Color3.fromRGB(250, 160, 50) -- Glowing gold outline highlight
+                cellStroke.Thickness = 1
+            else
+                cellStroke.Color = colors.Header
+                cellStroke.Thickness = 1
+            end
         end
     end
     
@@ -1694,13 +2126,39 @@ for idx, name in ipairs(themeNames) do
     
     table.insert(connections, btn.MouseButton1Click:Connect(function()
         applyTheme(name)
+        themeLabel.Text = "Menu Theme: " .. name
+    end))
+    
+    table.insert(connections, btn.MouseEnter:Connect(function()
+        themeLabel.Text = "Menu Theme: " .. name
+        local colors = themes[currentTheme]
+        if currentTheme ~= name then
+            cellStroke.Color = colors.Accent
+        end
+    end))
+    
+    table.insert(connections, btn.MouseLeave:Connect(function()
+        themeLabel.Text = "Menu Theme: " .. currentTheme
+        local colors = themes[currentTheme]
+        if currentTheme ~= name then
+            if isNewTheme then
+                cellStroke.Color = Color3.fromRGB(250, 160, 50)
+            else
+                cellStroke.Color = colors.Header
+            end
+        end
     end))
     
     updateBtnStyle()
 end
 
+local themeNames = {"Dark", "Purple", "Aqua", "Sakura", "Cyberpunk", "Forest", "Nordic", "Sunset", "Midnight", "Emerald", "Nebula", "Monochrome", "Light", "DeepDark"}
+for idx, name in ipairs(themeNames) do
+    createThemeCell(idx, name)
+end
+
 -- UI Scale Slider
-local scaleSliderRow, updateScaleSlider = createSlider(settingsTab, "UI Scale", 50, 150, 100, 6, function(val)
+scaleSliderRow, updateScaleSlider = createSlider(settingsTab, "UI Scale", 50, 150, 100, 6, function(val)
     local scale = val / 100
     if mainScale then
         mainScale.Scale = scale
@@ -1711,16 +2169,16 @@ local scaleSliderRow, updateScaleSlider = createSlider(settingsTab, "UI Scale", 
 end, "%")
 
 -- Island Scale Slider
-local islandScaleSliderRow, updateIslandScaleSlider = createSlider(settingsTab, "Island Scale", 50, 150, 100, 7, function(val)
+islandScaleSliderRow, updateIslandScaleSlider = createSlider(settingsTab, "Island Scale", 50, 150, 100, 7, function(val)
     if islandScale then
         islandScale.Scale = val / 100
     end
 end, "%")
 
--- Font Selector Row
-local fontRow = createRow(settingsTab, "FontRow", 80, 8)
+-- Font Selector Row (Expanded height to 125 to comfortably fit 10 fonts across 4 rows)
+fontRow = createRow(settingsTab, "FontRow", 125, 8)
 
-local fontLabel = Instance.new("TextLabel")
+fontLabel = Instance.new("TextLabel")
 fontLabel.Size = UDim2.new(1, -20, 0, 20)
 fontLabel.Position = UDim2.new(0, 10, 0, 6)
 fontLabel.BackgroundTransparency = 1
@@ -1732,21 +2190,20 @@ fontLabel.Parent = fontRow
 registerThemeElement(fontLabel, "Text")
 registerFontElement(fontLabel, "Bold")
 
-local fontContainer = Instance.new("Frame")
-fontContainer.Size = UDim2.new(1, -20, 1, -34)
-fontContainer.Position = UDim2.new(0, 10, 0, 28)
+fontContainer = Instance.new("Frame")
+fontContainer.Size = UDim2.new(1, -20, 1, -30)
+fontContainer.Position = UDim2.new(0, 10, 0, 26)
 fontContainer.BackgroundTransparency = 1
 fontContainer.BorderSizePixel = 0
 fontContainer.Parent = fontRow
 
-local fontLayout = Instance.new("UIGridLayout")
+fontLayout = Instance.new("UIGridLayout")
 fontLayout.CellSize = UDim2.new(0, 75, 0, 20)
 fontLayout.CellPadding = UDim2.new(0, 6, 0, 4)
 fontLayout.SortOrder = Enum.SortOrder.LayoutOrder
 fontLayout.Parent = fontContainer
 
-local fontNames = {"SourceSans", "Roboto", "Gotham", "Code", "Ubuntu"}
-for idx, name in ipairs(fontNames) do
+local function createFontCell(idx, name)
     local btn = Instance.new("TextButton")
     btn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
     btn.Text = name
@@ -1755,7 +2212,6 @@ for idx, name in ipairs(fontNames) do
     btn.Font = fontFamilies[name].Bold
     btn.LayoutOrder = idx
     btn.Parent = fontContainer
-    registerFontElement(btn, "Bold")
     
     local btnCorner = Instance.new("UICorner")
     btnCorner.CornerRadius = UDim.new(0, 3)
@@ -1782,35 +2238,15 @@ for idx, name in ipairs(fontNames) do
     updateBtnStyle()
 end
 
+local fontNames = {"SourceSans", "Roboto", "Gotham", "Code", "Ubuntu", "Montserrat", "Arcade", "SciFi", "Nunito", "Fredoka"}
+for idx, name in ipairs(fontNames) do
+    createFontCell(idx, name)
+end
+
 -- DEFAULT TAB SETTINGS
 showTab("Player")
 
--- Sliders reference for async character loading updates
-local updateWSSliderUI = nil
-local updateJPSliderUI = nil
-
--- Asynchronously wait for initial character and read default values safely
-task.spawn(function()
-    character = player.Character or player.CharacterAdded:Wait()
-    local hum = character:WaitForChild("Humanoid", 10)
-    if hum then
-        humanoid = hum
-        pcall(function()
-            currentWalkSpeed = hum.WalkSpeed
-            isJumpPower = hum.UseJumpPower
-            currentJumpValue = isJumpPower and hum.JumpPower or hum.JumpHeight
-            minJump = 0
-            maxJump = isJumpPower and 250 or 150
-            
-            if updateWSSliderUI then
-                updateWSSliderUI((currentWalkSpeed - 16) / (200 - 16))
-            end
-            if updateJPSliderUI then
-                updateJPSliderUI((currentJumpValue - minJump) / (maxJump - minJump))
-            end
-        end)
-    end
-end)
+-- Initial character loading and physics defaults are synchronized during the initial loading screen sequence
 
 -- Re-hook humanoid and re-apply settings on character respawn (preserving slider settings)
 table.insert(connections, player.CharacterAdded:Connect(function(newCharacter)
@@ -1820,11 +2256,15 @@ table.insert(connections, player.CharacterAdded:Connect(function(newCharacter)
         humanoid = hum
         task.wait(0.5)
         pcall(function()
-            hum.WalkSpeed = currentWalkSpeed
-            if hum.UseJumpPower then
-                hum.JumpPower = currentJumpValue
-            else
-                hum.JumpHeight = currentJumpValue
+            if speedHackEnabled then
+                hum.WalkSpeed = currentWalkSpeed
+            end
+            if jumpForceEnabled then
+                if hum.UseJumpPower then
+                    hum.JumpPower = currentJumpValue
+                else
+                    hum.JumpHeight = currentJumpValue
+                end
             end
         end)
     end
@@ -1833,6 +2273,22 @@ end))
 -- Helper function to apply visuals to a single player character
 local function updateCharacterVisuals(targetPlayer, char)
     if not char then return end
+    if targetPlayer == player then
+        -- Clean up any visual leftovers on local character
+        local highlight = char:FindFirstChild("BurLixHighlight")
+        if highlight then highlight:Destroy() end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local boxGui = hrp:FindFirstChild("BurLixBoxGui")
+            if boxGui then boxGui:Destroy() end
+        end
+        local head = char:FindFirstChild("Head")
+        if head then
+            local billboard = head:FindFirstChild("BurLixNameTag")
+            if billboard then billboard:Destroy() end
+        end
+        return
+    end
     
     -- Outline/Fill highlight handling
     local highlight = char:FindFirstChild("BurLixHighlight")
@@ -1990,49 +2446,310 @@ end
 
 -- ==================== PLAYER TAB CONTENTS ====================
 
--- WalkSpeed Slider
-local wsRow, updateWSSlider = createSlider(playerTab, "Walk Speed", 16, 200, currentWalkSpeed, 1, function(val)
-    currentWalkSpeed = val
-    if humanoid then
-        pcall(function() humanoid.WalkSpeed = val end)
-    end
-end)
-updateWSSliderUI = updateWSSlider
+-- Player Speed Toggle with Speed Slider Settings Panel
+do
+    local wsSettingsPanel, wsSettingsHeight
+    wsRow = createToggle(playerTab, "Player Speed", false, 1, function(state)
+        speedHackEnabled = state
+        if humanoid then
+            pcall(function()
+                humanoid.WalkSpeed = state and currentWalkSpeed or 16
+            end)
+        end
+    end, function()
+        if wsSettingsPanel and wsSettingsHeight then
+            toggleSettingsPanel(wsSettingsPanel, wsSettingsHeight)
+        end
+    end)
 
--- JumpPower Slider
-local jpRow, updateJPSlider = createSlider(playerTab, "Jump Ability", minJump, maxJump, currentJumpValue, 2, function(val)
-    currentJumpValue = val
-    if humanoid then
-        pcall(function()
-            if humanoid.UseJumpPower then
-                humanoid.JumpPower = val
+    wsSettingsPanel, wsSettingsHeight = createSettingsPanel(playerTab, 2, nil, nil, {
+        {
+            name = "Speed Value",
+            min = 16,
+            max = 200,
+            default = currentWalkSpeed,
+            onChange = function(val)
+                currentWalkSpeed = val
+                if speedHackEnabled and humanoid then
+                    pcall(function()
+                        humanoid.WalkSpeed = val
+                    end)
+                end
+            end
+        }
+    })
+end
+
+-- Jump Force Toggle with Jump Slider Settings Panel
+do
+    local jpSettingsPanel, jpSettingsHeight
+    jpRow = createToggle(playerTab, "Jump Force", false, 3, function(state)
+        jumpForceEnabled = state
+        if humanoid then
+            pcall(function()
+                if state then
+                    if humanoid.UseJumpPower then
+                        humanoid.JumpPower = currentJumpValue
+                    else
+                        humanoid.JumpHeight = currentJumpValue
+                    end
+                else
+                    if humanoid.UseJumpPower then
+                        humanoid.JumpPower = 50
+                    else
+                        humanoid.JumpHeight = 7.2
+                    end
+                end
+            end)
+        end
+    end, function()
+        if jpSettingsPanel and jpSettingsHeight then
+            toggleSettingsPanel(jpSettingsPanel, jpSettingsHeight)
+        end
+    end)
+
+    jpSettingsPanel, jpSettingsHeight = createSettingsPanel(playerTab, 4, nil, nil, {
+        {
+            name = "Jump Value",
+            min = 0,
+            max = 250,
+            default = currentJumpValue,
+            onChange = function(val)
+                currentJumpValue = val
+                if jumpForceEnabled and humanoid then
+                    pcall(function()
+                        if humanoid.UseJumpPower then
+                            humanoid.JumpPower = val
+                        else
+                            humanoid.JumpHeight = val
+                        end
+                    end)
+                end
+            end
+        }
+    })
+end
+
+-- Click TP Toggle
+local clickTPRenderConnection = nil
+clickTPRow = createToggle(playerTab, "Click TP", false, 5, function(state)
+    clickTPEnabled = state
+    if state then
+        -- Create the 3D visual plumbob cursor if it doesn't exist
+        if not clickTPVisual then
+            clickTPVisual = Instance.new("Model")
+            clickTPVisual.Name = "ClickTPVisual"
+            
+            -- 1. Create Floating Plumbob Crystal
+            local plumbob = Instance.new("Part")
+            plumbob.Name = "Plumbob"
+            plumbob.Size = Vector3.new(1, 2, 1)
+            plumbob.Material = Enum.Material.Neon
+            plumbob.Transparency = 0.2
+            plumbob.CanCollide = false
+            plumbob.CanTouch = false
+            plumbob.CanQuery = false
+            plumbob.Anchored = true
+            plumbob.CastShadow = false
+            plumbob.Parent = clickTPVisual
+            
+            local mesh = Instance.new("SpecialMesh")
+            mesh.MeshType = Enum.MeshType.FileMesh
+            mesh.MeshId = "rbxassetid://9756362"
+            mesh.Scale = Vector3.new(0.7, 0.7, 0.7)
+            mesh.Parent = plumbob
+            
+            -- 2. Create Ground Alignment Disc (oriented along X, resized to lie flat when rotated)
+            local groundDisc = Instance.new("Part")
+            groundDisc.Name = "GroundDisc"
+            groundDisc.Size = Vector3.new(0.1, 3, 3)
+            groundDisc.Material = Enum.Material.Neon
+            groundDisc.Transparency = 0.4
+            groundDisc.CanCollide = false
+            groundDisc.CanTouch = false
+            groundDisc.CanQuery = false
+            groundDisc.Anchored = true
+            groundDisc.CastShadow = false
+            groundDisc.Parent = clickTPVisual
+            
+            local discMesh = Instance.new("SpecialMesh")
+            discMesh.MeshType = Enum.MeshType.Cylinder
+            discMesh.Scale = Vector3.new(1, 1, 1)
+            discMesh.Parent = groundDisc
+            
+            -- Add a light to illuminate the landing area
+            local pointLight = Instance.new("PointLight")
+            pointLight.Range = 12
+            pointLight.Brightness = 2.5
+            pointLight.Parent = groundDisc
+        end
+        
+        -- Set mouse filter to ignore local character parts
+        local mouse = player:GetMouse()
+        if mouse then
+            mouse.TargetFilter = player.Character
+        end
+        
+        -- Start mouse cursor tracking and animation (spin + float) loop
+        local timeElapsed = 0
+        clickTPRenderConnection = RunService.RenderStepped:Connect(function(dt)
+            if not clickTPEnabled then
+                if clickTPRenderConnection then
+                    clickTPRenderConnection:Disconnect()
+                    clickTPRenderConnection = nil
+                end
+                if clickTPVisual then
+                    clickTPVisual.Parent = nil
+                end
+                local m = player:GetMouse()
+                if m then
+                    m.TargetFilter = nil
+                end
+                return
+            end
+            
+            timeElapsed = timeElapsed + dt
+            local mouse = player:GetMouse()
+            local holdingCtrl = UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl)
+            if holdingCtrl and mouse and mouse.Target then
+                local hitPos = mouse.Hit.Position
+                
+                -- Position Ground Alignment Disc (Rotate cylinder flat on the floor)
+                local groundDisc = clickTPVisual:FindFirstChild("GroundDisc")
+                if groundDisc then
+                    groundDisc.CFrame = CFrame.new(hitPos) * CFrame.Angles(0, 0, math.rad(90))
+                end
+                
+                -- Position Floating Plumbob above the disc
+                local floatOffset = math.sin(timeElapsed * 4) * 0.3 + 1.8
+                local spinAngle = timeElapsed * 90
+                local plumbob = clickTPVisual:FindFirstChild("Plumbob")
+                if plumbob then
+                    plumbob.CFrame = CFrame.new(hitPos + Vector3.new(0, floatOffset, 0)) * CFrame.Angles(0, math.rad(spinAngle), 0)
+                end
+                
+                clickTPVisual.Parent = Workspace
+                
+                -- Update light/neon color to match theme Accent
+                local colors = themes[currentTheme]
+                if colors then
+                    if plumbob then plumbob.Color = colors.Accent end
+                    if groundDisc then
+                        groundDisc.Color = colors.Accent
+                        local pl = groundDisc:FindFirstChildOfClass("PointLight")
+                        if pl then
+                            pl.Color = colors.Accent
+                        end
+                    end
+                end
             else
-                humanoid.JumpHeight = val
+                clickTPVisual.Parent = nil
             end
         end)
+        table.insert(connections, clickTPRenderConnection)
+
+        local mouse = player:GetMouse()
+        if mouse then
+            mouse.TargetFilter = player.Character
+            clickTPConnection = mouse.Button1Down:Connect(function()
+                if not clickTPEnabled then return end
+                -- Click TP triggers when holding Control (Ctrl + Click) and mouse.Target is not nil
+                local holdingCtrl = UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl)
+                if holdingCtrl and mouse.Target then
+                    local char = player.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        local targetPos = mouse.Hit.Position + Vector3.new(0, 3, 0)
+                        hrp.CFrame = CFrame.new(targetPos)
+                    end
+                end
+            end)
+            table.insert(connections, clickTPConnection)
+        end
+    else
+        -- Clean up TargetFilter
+        local mouse = player:GetMouse()
+        if mouse then
+            mouse.TargetFilter = nil
+        end
+        
+        -- Clean up tracking loop
+        if clickTPRenderConnection then
+            clickTPRenderConnection:Disconnect()
+            for idx, c in ipairs(connections) do
+                if c == clickTPRenderConnection then
+                    table.remove(connections, idx)
+                    break
+                end
+            end
+            clickTPRenderConnection = nil
+        end
+        
+        -- Hide the 3D visual cursor
+        if clickTPVisual then
+            clickTPVisual.Parent = nil
+        end
+        
+        -- Clean up mouse click connection
+        if clickTPConnection then
+            clickTPConnection:Disconnect()
+            for idx, c in ipairs(connections) do
+                if c == clickTPConnection then
+                    table.remove(connections, idx)
+                    break
+                end
+            end
+            clickTPConnection = nil
+        end
     end
 end)
-updateJPSliderUI = updateJPSlider
 
 
 -- ==================== WORLD TAB CONTENTS ====================
 
--- Gravity Slider
-local gravitySliderRow, updateGravitySlider = createSlider(worldTab, "Gravity", 0, 500, Workspace.Gravity, 1, function(val)
-    pcall(function() Workspace.Gravity = val end)
-end)
+-- Gravity Toggle with Gravity Slider Settings Panel
+do
+    local gravitySettingsPanel, gravitySettingsHeight
+    gravityRow = createToggle(worldTab, "Gravity", false, 1, function(state)
+        gravityEnabled = state
+        pcall(function()
+            Workspace.Gravity = state and currentGravityValue or 196.2
+        end)
+    end, function()
+        if gravitySettingsPanel and gravitySettingsHeight then
+            toggleSettingsPanel(gravitySettingsPanel, gravitySettingsHeight)
+        end
+    end)
+
+    gravitySettingsPanel, gravitySettingsHeight = createSettingsPanel(worldTab, 2, nil, nil, {
+        {
+            name = "Gravity Value",
+            min = 0,
+            max = 500,
+            default = currentGravityValue,
+            onChange = function(val)
+                currentGravityValue = val
+                if gravityEnabled then
+                    pcall(function()
+                        Workspace.Gravity = val
+                    end)
+                end
+            end
+        }
+    })
+end
 
 
 -- ==================== AUTHORS TAB CONTENTS ====================
 
 -- Creators Info (Separated thank you footer to prevent clipping)
-local creatorsCard = createRow(authorsTab, "CreatorsCard", 120, 1)
+creatorsCard = createRow(authorsTab, "CreatorsCard", 120, 1)
 
-local creatorsLabel = Instance.new("TextLabel")
+creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v1.8.3\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v2.2.2\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -2043,7 +2760,7 @@ creatorsLabel.Parent = creatorsCard
 registerThemeElement(creatorsLabel, "Text")
 registerFontElement(creatorsLabel, "Bold")
 
-local thankYouLabel = Instance.new("TextLabel")
+thankYouLabel = Instance.new("TextLabel")
 thankYouLabel.Size = UDim2.new(1, -20, 0, 20)
 thankYouLabel.Position = UDim2.new(0, 10, 1, -25)
 thankYouLabel.BackgroundTransparency = 1
@@ -2057,13 +2774,13 @@ registerThemeElement(thankYouLabel, "Text")
 registerFontElement(thankYouLabel, "Regular")
 
 -- Changelog Card (Taller to comfortably fit wrapped version history text)
-local changelogCard = createRow(authorsTab, "ChangelogCard", 195, 2)
+changelogCard = createRow(authorsTab, "ChangelogCard", 195, 2)
 
-local changelogLabel = Instance.new("TextLabel")
+changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v1.8.3:\n- Fixed profile card navigation: replaced TextButton layout with Frame + Invisible Overlay Button to guarantee click-through detection.\n- Fixed World tab icon to a fully validated Lucide globe asset.\n- Redesigned Top Stats Island: removed player nickname, set width to 250px, and replaced text Toggle with an arrow state indicator (▲ / ▼)."
+changelogLabel.Text = "Changelog v2.2.2:\n- Added sitting mascot (decal ID 3116499937 using rbxthumb format) sitting on the top-left corner of the window, exclusive to the DeepDark theme.\n- Mascot follows window drag/tween dynamically and fades in/out matching GroupTransparency.\n\nChangelog v2.2.1:\n- Fixed UIStroke outlines (profile, bind, keybind, hex textboxes) to dynamically adapt their colors with themes, resolving the harsh dark/bold outlines on the Light theme.\n\nChangelog v2.2.0:\n- Added new themes: \"Light\" (clean light design) and \"DeepDark\" (extra dark high contrast design with hot red accents).\n- Visually highlighted the new themes in the selector grid using golden/orange outlines and custom floating \"NEW\" badges.\n- Expanded the theme container height to 135px to prevent grid cell clipping.\n\nChangelog v2.1.3:\n- Increased corner rounding of compact slider field backgrounds to 6px for a smoother look.\n\nChangelog v2.1.2:\n- Adjusted slider track background transparency to 0.38 (slightly more visible as requested).\n- Implemented dynamic loading screen stages (randomizes stages, speeds, pauses, and introduces occasional artificial loading lags/stalls for maximum realism).\n\nChangelog v2.1.1:\n- Adjusted slider track background transparency to 0.55 to make the groove container less prominent and blend softly with the settings panel.\n\nChangelog v2.1.0:\n- Added a distinct rounded background container specifically behind the slider track area (from start to end), serving as an interactive groove/channel.\n- Bound slider click/drag detection to the entire track background for better responsiveness.\n\nChangelog v2.0.9:\n- Added a distinct background card (bubble) and proper padding/margins for each compact slider to visually isolate them within the settings panel.\n\nChangelog v2.0.8:\n- Fixed compact sliders layout (widened labels to prevent text overlap, added right margin to prevent sliders from touching the edge).\n\nChangelog v2.0.7:\n- Excluded LocalPlayer from visual effects (Chams, Borders, Names, Boxes).\n\nChangelog v2.0.6:\n- Aligned loading screen style with the main menu theme (glass transparency, header borders, no gradient)."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -2075,21 +2792,23 @@ registerThemeElement(changelogLabel, "Text")
 registerFontElement(changelogLabel, "Regular")
 
 -- User Info Card
-local infoRow = createRow(authorsTab, "InfoRow", 100, 3)
+infoRow = createRow(authorsTab, "InfoRow", 100, 3)
 
-local infoLabel = Instance.new("TextLabel")
+infoLabel = Instance.new("TextLabel")
 infoLabel.Size = UDim2.new(1, -20, 1, -10)
 infoLabel.Position = UDim2.new(0, 10, 0, 5)
 infoLabel.BackgroundTransparency = 1
 
-local username = player.Name or "Unknown"
-local displayName = player.DisplayName or username
-local accountAge = 0
-pcall(function()
-    accountAge = player.AccountAge or 0
-end)
+do
+    local username = player.Name or "Unknown"
+    local displayName = player.DisplayName or username
+    local accountAge = 0
+    pcall(function()
+        accountAge = player.AccountAge or 0
+    end)
 
-infoLabel.Text = string.format("User: %s\nDisplay: %s\nAccount Age: %s days\nPlatform: Roblox Client", username, displayName, tostring(accountAge))
+    infoLabel.Text = string.format("User: %s\nDisplay: %s\nAccount Age: %s days\nPlatform: Roblox Client", username, displayName, tostring(accountAge))
+end
 infoLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 infoLabel.TextSize = 13
 infoLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -2103,140 +2822,148 @@ registerFontElement(infoLabel, "Regular")
 
 -- ==================== VISUALS TAB CONTENTS ====================
 
-local highlightSettingsPanel, highlightSettingsHeight
-local highlightRow = createToggle(visualsTab, "Enable Highlighting", false, 1, function(state)
-    highlightEnabled = state
-    refreshAllVisuals()
-end, function()
-    if highlightSettingsPanel and highlightSettingsHeight then
-        toggleSettingsPanel(highlightSettingsPanel, highlightSettingsHeight)
-    end
-end)
-
-highlightSettingsPanel, highlightSettingsHeight = createSettingsPanel(visualsTab, 2, highlightColor, function(color)
-    highlightColor = color
-    refreshAllVisuals()
-end, {
-    {
-        name = "Fill Trans",
-        min = 0,
-        max = 1,
-        default = highlightTransparency,
-        onChange = function(val)
-            highlightTransparency = val
-            refreshAllVisuals()
+do
+    local highlightSettingsPanel, highlightSettingsHeight
+    highlightRow = createToggle(visualsTab, "Chams", false, 1, function(state)
+        highlightEnabled = state
+        refreshAllVisuals()
+    end, function()
+        if highlightSettingsPanel and highlightSettingsHeight then
+            toggleSettingsPanel(highlightSettingsPanel, highlightSettingsHeight)
         end
-    },
-    {
-        name = "Outline Trans",
-        min = 0,
-        max = 1,
-        default = highlightOutlineTransparency,
-        onChange = function(val)
-            highlightOutlineTransparency = val
-            refreshAllVisuals()
+    end)
+
+    highlightSettingsPanel, highlightSettingsHeight = createSettingsPanel(visualsTab, 2, highlightColor, function(color)
+        highlightColor = color
+        refreshAllVisuals()
+    end, {
+        {
+            name = "Fill Trans",
+            min = 0,
+            max = 1,
+            default = highlightTransparency,
+            onChange = function(val)
+                highlightTransparency = val
+                refreshAllVisuals()
+            end
+        },
+        {
+            name = "Outline Trans",
+            min = 0,
+            max = 1,
+            default = highlightOutlineTransparency,
+            onChange = function(val)
+                highlightOutlineTransparency = val
+                refreshAllVisuals()
+            end
+        }
+    })
+end
+
+do
+    local borderSettingsPanel, borderSettingsHeight
+    borderRow = createToggle(visualsTab, "Borders", false, 3, function(state)
+        bordersEnabled = state
+        refreshAllVisuals()
+    end, function()
+        if borderSettingsPanel and borderSettingsHeight then
+            toggleSettingsPanel(borderSettingsPanel, borderSettingsHeight)
         end
-    }
-})
+    end)
 
-local borderSettingsPanel, borderSettingsHeight
-local borderRow = createToggle(visualsTab, "Enable Borders", false, 3, function(state)
-    bordersEnabled = state
-    refreshAllVisuals()
-end, function()
-    if borderSettingsPanel and borderSettingsHeight then
-        toggleSettingsPanel(borderSettingsPanel, borderSettingsHeight)
-    end
-end)
+    borderSettingsPanel, borderSettingsHeight = createSettingsPanel(visualsTab, 4, borderColor, function(color)
+        borderColor = color
+        refreshAllVisuals()
+    end, {
+        {
+            name = "Outline Trans",
+            min = 0,
+            max = 1,
+            default = borderTransparency,
+            onChange = function(val)
+                borderTransparency = val
+                refreshAllVisuals()
+            end
+        }
+    })
+end
 
-borderSettingsPanel, borderSettingsHeight = createSettingsPanel(visualsTab, 4, borderColor, function(color)
-    borderColor = color
-    refreshAllVisuals()
-end, {
-    {
-        name = "Outline Trans",
-        min = 0,
-        max = 1,
-        default = borderTransparency,
-        onChange = function(val)
-            borderTransparency = val
-            refreshAllVisuals()
+do
+    local nameSettingsPanel, nameSettingsHeight
+    nameRow = createToggle(visualsTab, "Show Names", false, 5, function(state)
+        namesEnabled = state
+        refreshAllVisuals()
+    end, function()
+        if nameSettingsPanel and nameSettingsHeight then
+            toggleSettingsPanel(nameSettingsPanel, nameSettingsHeight)
         end
-    }
-})
+    end)
 
-local nameSettingsPanel, nameSettingsHeight
-local nameRow = createToggle(visualsTab, "Show Names", false, 5, function(state)
-    namesEnabled = state
-    refreshAllVisuals()
-end, function()
-    if nameSettingsPanel and nameSettingsHeight then
-        toggleSettingsPanel(nameSettingsPanel, nameSettingsHeight)
-    end
-end)
+    nameSettingsPanel, nameSettingsHeight = createSettingsPanel(visualsTab, 6, nameColor, function(color)
+        nameColor = color
+        refreshAllVisuals()
+    end, {
+        {
+            name = "Font Size",
+            min = 10,
+            max = 24,
+            default = nameSize,
+            onChange = function(val)
+                nameSize = val
+                refreshAllVisuals()
+            end
+        },
+        {
+            name = "Stroke Thick",
+            min = 0,
+            max = 4,
+            default = nameStrokeThickness,
+            onChange = function(val)
+                nameStrokeThickness = val
+                refreshAllVisuals()
+            end
+        }
+    })
+end
 
-nameSettingsPanel, nameSettingsHeight = createSettingsPanel(visualsTab, 6, nameColor, function(color)
-    nameColor = color
-    refreshAllVisuals()
-end, {
-    {
-        name = "Font Size",
-        min = 10,
-        max = 24,
-        default = nameSize,
-        onChange = function(val)
-            nameSize = val
-            refreshAllVisuals()
+do
+    local boxSettingsPanel, boxSettingsHeight
+    boxRow = createToggle(visualsTab, "Boxes", false, 7, function(state)
+        boxesEnabled = state
+        refreshAllVisuals()
+    end, function()
+        if boxSettingsPanel and boxSettingsHeight then
+            toggleSettingsPanel(boxSettingsPanel, boxSettingsHeight)
         end
-    },
-    {
-        name = "Stroke Thick",
-        min = 0,
-        max = 4,
-        default = nameStrokeThickness,
-        onChange = function(val)
-            nameStrokeThickness = val
-            refreshAllVisuals()
-        end
-    }
-})
+    end)
 
-local boxSettingsPanel, boxSettingsHeight
-local boxRow = createToggle(visualsTab, "Show Boxes", false, 7, function(state)
-    boxesEnabled = state
-    refreshAllVisuals()
-end, function()
-    if boxSettingsPanel and boxSettingsHeight then
-        toggleSettingsPanel(boxSettingsPanel, boxSettingsHeight)
-    end
-end)
-
-boxSettingsPanel, boxSettingsHeight = createSettingsPanel(visualsTab, 8, boxColor, function(color)
-    boxColor = color
-    refreshAllVisuals()
-end, {
-    {
-        name = "Thickness",
-        min = 1,
-        max = 5,
-        default = boxThickness,
-        onChange = function(val)
-            boxThickness = val
-            refreshAllVisuals()
-        end
-    },
-    {
-        name = "Transparency",
-        min = 0,
-        max = 1,
-        default = boxTransparency,
-        onChange = function(val)
-            boxTransparency = val
-            refreshAllVisuals()
-        end
-    }
-})
-
+    boxSettingsPanel, boxSettingsHeight = createSettingsPanel(visualsTab, 8, boxColor, function(color)
+        boxColor = color
+        refreshAllVisuals()
+    end, {
+        {
+            name = "Thickness",
+            min = 1,
+            max = 5,
+            default = boxThickness,
+            onChange = function(val)
+                boxThickness = val
+                refreshAllVisuals()
+            end
+        },
+        {
+            name = "Transparency",
+            min = 0,
+            max = 1,
+            default = boxTransparency,
+            onChange = function(val)
+                boxTransparency = val
+                refreshAllVisuals()
+            end
+        }
+    })
+end
+applyTheme(currentTheme)
 
 -- ==================== LOGIC AND INTERACTION ====================
 
@@ -2259,6 +2986,9 @@ local function unload()
         end
     end
     table.clear(connections)
+    if clickTPVisual then
+        pcall(function() clickTPVisual:Destroy() end)
+    end
     
     pcall(function()
         if screenGui and screenGui.Parent then
@@ -2269,7 +2999,16 @@ end
 
 table.insert(connections, closeButton.MouseButton1Click:Connect(unload))
 table.insert(connections, settingsButton.MouseButton1Click:Connect(function()
-    if activeTabName == "Settings" then
+    local isSettings = activeTabName == "Settings"
+    local icon = settingsButton:FindFirstChild("Icon")
+    if icon then
+        local targetRotation = isSettings and 0 or 180
+        TweenService:Create(icon, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Rotation = targetRotation
+        }):Play()
+    end
+    
+    if isSettings then
         showTab(lastActiveTab)
     else
         showTab("Settings")
@@ -2279,6 +3018,7 @@ table.insert(connections, screenGui.Destroying:Connect(unload))
 
 -- Toggle Menu Visibility with Keybind
 table.insert(connections, UserInputService.InputBegan:Connect(function(input)
+    if listeningForKeybind then return end
     if input.KeyCode == menuKeybind then
         toggleUI()
     end
@@ -2384,4 +3124,274 @@ table.insert(connections, RunService.RenderStepped:Connect(function()
         end)
         islandPing.Text = "Ping: " .. string.format("%.0f ms", ping * 1000)
     end
+    
+    -- Sync DeepDark sitting mascot position, size and transparency
+    if deepDarkMascot then
+        if currentTheme == "DeepDark" then
+            if mainFrame.Visible then
+                deepDarkMascot.Size = UDim2.new(0, 140, 0, 140)
+                local mainPos = mainFrame.AbsolutePosition
+                -- Align bottom-left of mascot to top-left of mainFrame with a small overlap (legs hanging over titleBar)
+                deepDarkMascot.Position = UDim2.new(0, mainPos.X + 10, 0, mainPos.Y + 28)
+                deepDarkMascot.ImageTransparency = mainFrame.GroupTransparency
+                wasMainVisible = true
+            elseif islandFrame and islandFrame.Visible then
+                deepDarkMascot.Size = UDim2.new(0, 40, 0, 40)
+                local islandPos = islandFrame.AbsolutePosition
+                -- Align bottom-left of mascot to top-left of islandFrame with a small overlap (legs hanging over island)
+                deepDarkMascot.Position = UDim2.new(0, islandPos.X - 4, 0, islandPos.Y + 8)
+                
+                -- Smoothly fade in on the island when the menu finishes closing
+                if wasMainVisible then
+                    wasMainVisible = false
+                    deepDarkMascot.ImageTransparency = 1
+                    TweenService:Create(deepDarkMascot, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                        ImageTransparency = 0
+                    }):Play()
+                end
+            else
+                -- Hide off-screen and make transparent to keep the texture preloaded in GPU memory
+                deepDarkMascot.Position = UDim2.new(0, -500, 0, -500)
+                deepDarkMascot.ImageTransparency = 1
+                wasMainVisible = false
+            end
+        else
+            -- Hide off-screen and make transparent to keep the texture preloaded in GPU memory
+            deepDarkMascot.Position = UDim2.new(0, -500, 0, -500)
+            deepDarkMascot.ImageTransparency = 1
+            wasMainVisible = false
+        end
+    end
 end))
+
+-- ==================== LOADING SCREEN ====================
+local function startLoadingScreen()
+    local colors = themes[currentTheme] or {
+        Background = Color3.fromRGB(30, 30, 35),
+        Sidebar = Color3.fromRGB(35, 35, 40),
+        Accent = Color3.fromRGB(80, 80, 250),
+        Text = Color3.fromRGB(240, 240, 245)
+    }
+    
+    local loadingFrame = Instance.new("CanvasGroup")
+    loadingFrame.Name = "LoadingFrame"
+    loadingFrame.Size = UDim2.new(0, 300, 0, 300)
+    loadingFrame.Position = UDim2.new(0.5, -150, 0.5, -150)
+    loadingFrame.BackgroundColor3 = colors.Background
+    loadingFrame.BackgroundTransparency = 0.12
+    loadingFrame.BorderSizePixel = 0
+    loadingFrame.Parent = screenGui
+    
+    local loadingCorner = Instance.new("UICorner")
+    loadingCorner.CornerRadius = UDim.new(0, 4)
+    loadingCorner.Parent = loadingFrame
+    
+    local loadingStroke = Instance.new("UIStroke")
+    loadingStroke.Thickness = 1
+    loadingStroke.Color = colors.Header or Color3.fromRGB(40, 40, 45)
+    loadingStroke.Transparency = 0
+    loadingStroke.Parent = loadingFrame
+    
+    -- Logo Image
+    local logo = Instance.new("ImageLabel")
+    logo.Name = "Logo"
+    logo.Size = UDim2.new(0, 90, 0, 90)
+    logo.Position = UDim2.new(0.5, -45, 0, 30)
+    logo.BackgroundTransparency = 1
+    logo.Image = "rbxassetid://6998152591"
+    logo.Parent = loadingFrame
+    
+    local logoCorner = Instance.new("UICorner")
+    logoCorner.CornerRadius = UDim.new(0, 8)
+    logoCorner.Parent = logo
+    
+    -- Title Label
+    local title = Instance.new("TextLabel")
+    title.Name = "Title"
+    title.Size = UDim2.new(1, 0, 0, 30)
+    title.Position = UDim2.new(0, 0, 0, 135)
+    title.BackgroundTransparency = 1
+    title.Text = "BurLix HUB"
+    title.TextColor3 = colors.Text
+    title.TextSize = 20
+    title.Font = fontFamilies[currentFontFamily].Bold
+    title.Parent = loadingFrame
+    
+    -- Please Wait Label
+    local pleaseWait = Instance.new("TextLabel")
+    pleaseWait.Name = "PleaseWait"
+    pleaseWait.Size = UDim2.new(1, 0, 0, 15)
+    pleaseWait.Position = UDim2.new(0, 0, 0, 162)
+    pleaseWait.BackgroundTransparency = 1
+    pleaseWait.Text = "Please wait"
+    pleaseWait.TextColor3 = colors.Text
+    pleaseWait.TextSize = 11
+    pleaseWait.Font = fontFamilies[currentFontFamily].Regular
+    pleaseWait.TextTransparency = 0.2
+    pleaseWait.Parent = loadingFrame
+    
+    local pleaseWaitTween = TweenService:Create(pleaseWait, TweenInfo.new(1.0, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+        TextTransparency = 0.6
+    })
+    pleaseWaitTween:Play()
+    
+    -- Status Label
+    local status = Instance.new("TextLabel")
+    status.Name = "Status"
+    status.Size = UDim2.new(1, -40, 0, 20)
+    status.Position = UDim2.new(0, 20, 0, 185)
+    status.BackgroundTransparency = 1
+    status.Text = "Loading Assets..."
+    status.TextColor3 = Color3.fromRGB(180, 180, 185)
+    status.TextSize = 11
+    status.Font = fontFamilies[currentFontFamily].Regular
+    status.Parent = loadingFrame
+    
+    -- Progress Bar Background
+    local barBg = Instance.new("Frame")
+    barBg.Name = "BarBackground"
+    barBg.Size = UDim2.new(1, -40, 0, 6)
+    barBg.Position = UDim2.new(0, 20, 0, 212)
+    barBg.BackgroundColor3 = colors.Sidebar
+    barBg.BorderSizePixel = 0
+    barBg.Parent = loadingFrame
+    
+    local barBgCorner = Instance.new("UICorner")
+    barBgCorner.CornerRadius = UDim.new(0, 3)
+    barBgCorner.Parent = barBg
+    
+    -- Progress Bar Fill
+    local barFill = Instance.new("Frame")
+    barFill.Name = "BarFill"
+    barFill.Size = UDim2.new(0, 0, 1, 0)
+    barFill.BackgroundColor3 = colors.Accent
+    barFill.BorderSizePixel = 0
+    barFill.Parent = barBg
+    
+    local barFillCorner = Instance.new("UICorner")
+    barFillCorner.CornerRadius = UDim.new(0, 3)
+    barFillCorner.Parent = barFill
+    
+    -- Percentage Label
+    local percent = Instance.new("TextLabel")
+    percent.Name = "Percent"
+    percent.Size = UDim2.new(1, 0, 0, 20)
+    percent.Position = UDim2.new(0, 0, 0, 226)
+    percent.BackgroundTransparency = 1
+    percent.Text = "0%"
+    percent.TextColor3 = colors.Accent
+    percent.TextSize = 14
+    percent.Font = fontFamilies[currentFontFamily].Bold
+    percent.Parent = loadingFrame
+    
+    -- Real Setup and Asset Loading Thread
+    task.spawn(function()
+        local ContentProvider = game:GetService("ContentProvider")
+        local currentProgress = 0
+        
+        local function advanceTo(target, stepDelay, pauseAfter)
+            while currentProgress < target do
+                currentProgress = currentProgress + 1
+                percent.Text = tostring(currentProgress) .. "%"
+                barFill.Size = UDim2.new(currentProgress / 100, 0, 1, 0)
+                task.wait(stepDelay)
+            end
+            if pauseAfter then
+                task.wait(pauseAfter)
+            end
+        end
+        
+        -- Stage 1: Load Avatar Thumbnail (0% -> 20%)
+        status.Text = "Loading player profile and avatar thumbnail..."
+        local avatarImageId = "rbxassetid://0"
+        pcall(function()
+            local thumbnailType = Enum.ThumbnailType.HeadShot
+            local thumbnailSize = Enum.ThumbnailSize.Size48x48
+            avatarImageId = Players:GetUserThumbnailAsync(player.UserId, thumbnailType, thumbnailSize)
+        end)
+        if avatarImage then
+            avatarImage.Image = avatarImageId
+        end
+        advanceTo(20, 0.005, 0.2)
+        
+        -- Stage 2: Initialize Character & Physics (20% -> 50%)
+        status.Text = "Waiting for local player character..."
+        character = player.Character or player.CharacterAdded:Wait()
+        advanceTo(35, 0.005, 0.15)
+        
+        status.Text = "Synchronizing humanoid physics..."
+        local hum = character:WaitForChild("Humanoid", 15)
+        if hum then
+            humanoid = hum
+            pcall(function()
+                currentWalkSpeed = hum.WalkSpeed
+                isJumpPower = hum.UseJumpPower
+                currentJumpValue = isJumpPower and hum.JumpPower or hum.JumpHeight
+                minJump = 0
+                maxJump = isJumpPower and 250 or 150
+            end)
+        end
+        advanceTo(50, 0.005, 0.2)
+        
+        -- Stage 3: Preload UI Assets (50% -> 80%)
+        status.Text = "Preloading logo asset..."
+        pcall(function()
+            ContentProvider:PreloadAsync({logo})
+        end)
+        advanceTo(60, 0.005, 0.15)
+        
+        status.Text = "Preloading avatar image..."
+        if avatarImage then
+            pcall(function()
+                ContentProvider:PreloadAsync({avatarImage})
+            end)
+        end
+        advanceTo(70, 0.005, 0.15)
+        
+        status.Text = "Preloading tab and mascot icons..."
+        pcall(function()
+            local assetList = {}
+            for _, iconId in pairs(tabIcons) do
+                table.insert(assetList, iconId)
+            end
+            if deepDarkMascot then
+                table.insert(assetList, deepDarkMascot) -- Pass actual ImageLabel instance to force download & decode
+            end
+            ContentProvider:PreloadAsync(assetList)
+        end)
+        advanceTo(80, 0.005, 0.2)
+        
+        -- Stage 4: Apply Theme and Configuration (80% -> 95%)
+        status.Text = "Applying theme configurations..."
+        pcall(function()
+            applyTheme(currentTheme)
+            applyFontFamily(currentFontFamily)
+            refreshAllVisuals()
+        end)
+        advanceTo(95, 0.005, 0.2)
+        
+        -- Stage 5: Ready (95% -> 100%)
+        status.Text = "BurLix HUB Ready!"
+        advanceTo(100, 0.005, 0.2)
+        
+        task.wait(0.1)
+        
+        -- Fade Out Loading Screen
+        local fadeTween = TweenService:Create(loadingFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+            GroupTransparency = 1
+        })
+        fadeTween:Play()
+        fadeTween.Completed:Connect(function()
+            loadingFrame:Destroy()
+            
+            -- Show Main UI & Stats Island
+            if islandFrame then
+                islandFrame.Visible = islandVisible
+            end
+            toggleUI() -- Beautiful fly-out animation
+        end)
+    end)
+end
+
+-- Start loading screen sequence
+startLoadingScreen()

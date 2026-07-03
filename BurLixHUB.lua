@@ -986,6 +986,7 @@ closeButton.TextSize = 12
 closeButton.Font = Enum.Font.SourceSansBold
 closeButton.Parent = titleBar
 registerThemeElement(closeButton, "Header")
+registerThemeElement(closeButton, "Text")
 registerFontElement(closeButton, "Bold")
 
 closeCorner = Instance.new("UICorner")
@@ -997,10 +998,12 @@ closeCorner.Parent = closeButton
 -- Close Button Hover/Click Styles
 closeButton.MouseEnter:Connect(function()
     closeButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+    closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 end)
 closeButton.MouseLeave:Connect(function()
     local colors = themes[currentTheme]
     closeButton.BackgroundColor3 = colors and colors.Header or Color3.fromRGB(50, 50, 55)
+    closeButton.TextColor3 = colors and colors.Text or Color3.fromRGB(240, 240, 245)
 end)
 
 -- Navigation Panel (Sidebar)

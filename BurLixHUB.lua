@@ -142,28 +142,41 @@ end
 -- Helper to retrieve local Mimi mascot asset
 local function getMimiMascotAsset()
     local fileName = "Mimi.png"
-    if isfile and not isfile(fileName) and isfile("mimi.png") then
-        fileName = "mimi.png"
-    end
-    if getcustomasset then
-        local success, asset = pcall(getcustomasset, fileName)
-        if success and asset then
-            return asset
+    if writefile and readfile and isfile and getcustomasset then
+        if not isfile(fileName) and isfile("mimi.png") then
+            fileName = "mimi.png"
+        end
+        if not isfile(fileName) then
+            local url = "https://raw.githubusercontent.com/Vench1k/roblox-custom-tools/main/Mimi.png"
+            local content = downloadFile(url)
+            if content and #content > 0 then
+                pcall(writefile, fileName, content)
+            end
+        end
+        if isfile(fileName) then
+            local success, asset = pcall(getcustomasset, fileName)
+            if success and asset then
+                return asset
+            end
         end
     end
     -- Fallback to Puro decal if custom assets are not supported or file is missing
     return "rbxthumb://type=Asset&id=3116499937&w=420&h=420"
 end
 
--- Asynchronously pre-download mascot file on startup to prevent pop-in delay
+-- Asynchronously pre-download mascot files on startup to prevent pop-in delay
 task.spawn(function()
     if writefile and isfile then
-        local fileName = "WhiteFurry.png"
-        if not isfile(fileName) then
-            local url = "https://raw.githubusercontent.com/Vench1k/roblox-custom-tools/main/WhiteFurry.png"
-            local content = downloadFile(url)
-            if content and #content > 0 then
-                pcall(writefile, fileName, content)
+        local files = {
+            ["WhiteFurry.png"] = "https://raw.githubusercontent.com/Vench1k/roblox-custom-tools/main/WhiteFurry.png",
+            ["Mimi.png"] = "https://raw.githubusercontent.com/Vench1k/roblox-custom-tools/main/Mimi.png"
+        }
+        for fileName, url in pairs(files) do
+            if not isfile(fileName) then
+                local content = downloadFile(url)
+                if content and #content > 0 then
+                    pcall(writefile, fileName, content)
+                end
             end
         end
     end

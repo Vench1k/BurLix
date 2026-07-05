@@ -141,11 +141,8 @@ end
 
 -- Helper to retrieve local Mimi mascot asset
 local function getMimiMascotAsset()
-    local fileName = "Mimi.png"
+    local fileName = "Mimi_v231.png"
     if writefile and readfile and isfile and getcustomasset then
-        if not isfile(fileName) and isfile("mimi.png") then
-            fileName = "mimi.png"
-        end
         if not isfile(fileName) then
             local url = "https://raw.githubusercontent.com/Vench1k/roblox-custom-tools/main/Mimi.png"
             local content = downloadFile(url)
@@ -169,7 +166,7 @@ task.spawn(function()
     if writefile and isfile then
         local files = {
             ["WhiteFurry.png"] = "https://raw.githubusercontent.com/Vench1k/roblox-custom-tools/main/WhiteFurry.png",
-            ["Mimi.png"] = "https://raw.githubusercontent.com/Vench1k/roblox-custom-tools/main/Mimi.png"
+            ["Mimi_v231.png"] = "https://raw.githubusercontent.com/Vench1k/roblox-custom-tools/main/Mimi.png"
         }
         for fileName, url in pairs(files) do
             if not isfile(fileName) then

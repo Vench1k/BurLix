@@ -233,21 +233,30 @@ local function syncMascotPositionAndSize()
     if not deepDarkMascot then return end
     if mascotLayoutTheme == "DeepDark" or mascotLayoutTheme == "Light" or mascotLayoutTheme == "Mimi" then
         local isLight = (mascotLayoutTheme == "Light")
+        local isMimi = (mascotLayoutTheme == "Mimi")
         if mainFrame and mainFrame.Visible then
-            deepDarkMascot.Size = isLight and UDim2.new(0, 85, 0, 140) or UDim2.new(0, 140, 0, 140)
+            if isMimi then
+                deepDarkMascot.Size = UDim2.new(0, 160, 0, 160)
+            else
+                deepDarkMascot.Size = isLight and UDim2.new(0, 85, 0, 140) or UDim2.new(0, 140, 0, 140)
+            end
             local mainPos = mainFrame.AbsolutePosition
-            local offsetX = isLight and 15 or 10
-            local offsetY = isLight and 44 or 38
+            local offsetX = isLight and 15 or (isMimi and 10 or 10)
+            local offsetY = isLight and 44 or (isMimi and 30 or 38)
             deepDarkMascot.Position = UDim2.new(0, mainPos.X + offsetX, 0, mainPos.Y + offsetY)
             if not isThemeTransitioning then
                 deepDarkMascot.ImageTransparency = mainFrame.GroupTransparency
             end
             wasMainVisible = true
         elseif islandFrame and islandFrame.Visible then
-            deepDarkMascot.Size = isLight and UDim2.new(0, 28, 0, 46) or UDim2.new(0, 46, 0, 46)
+            if isMimi then
+                deepDarkMascot.Size = UDim2.new(0, 52, 0, 52)
+            else
+                deepDarkMascot.Size = isLight and UDim2.new(0, 28, 0, 46) or UDim2.new(0, 46, 0, 46)
+            end
             local islandPos = islandFrame.AbsolutePosition
-            local offsetX = isLight and 0 or -6
-            local offsetY = isLight and 15 or 14
+            local offsetX = isLight and 0 or (isMimi and -8 or -6)
+            local offsetY = isLight and 15 or (isMimi and 11 or 14)
             deepDarkMascot.Position = UDim2.new(0, islandPos.X + offsetX, 0, islandPos.Y + offsetY)
             
             if not isThemeTransitioning then
@@ -425,14 +434,7 @@ local themes = {
         Card = Color3.fromRGB(30, 22, 42),
         Text = Color3.fromRGB(0, 255, 255)
     },
-    Forest = {
-        Background = Color3.fromRGB(15, 22, 18),
-        Header = Color3.fromRGB(20, 32, 25),
-        Accent = Color3.fromRGB(50, 200, 120),
-        Sidebar = Color3.fromRGB(18, 26, 21),
-        Card = Color3.fromRGB(25, 42, 32),
-        Text = Color3.fromRGB(230, 245, 235)
-    },
+
     Nordic = {
         Background = Color3.fromRGB(32, 36, 44),
         Header = Color3.fromRGB(40, 44, 52),
@@ -742,8 +744,8 @@ local function applyTheme(themeName)
     
     if titleText then
         local tweenInfoFast = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        -- Shift titleText to prevent overlap with mascot: X=150 for DeepDark (width 140), X=110 for Light (width 85), X=15 for others
-        local targetX = ((themeName == "DeepDark" or themeName == "Mimi") and 150) or (themeName == "Light" and 110) or 15
+        -- Shift titleText to prevent overlap with mascot: X=140 for Mimi (width 160, visual adjustment), X=150 for DeepDark (width 140), X=110 for Light (width 85), X=15 for others
+        local targetX = (themeName == "Mimi" and 140) or (themeName == "DeepDark" and 150) or (themeName == "Light" and 110) or 15
         pcall(function()
             TweenService:Create(titleText, tweenInfoFast, {
                 Position = UDim2.new(0, targetX, 0, 0)
@@ -791,6 +793,8 @@ registerThemeElement(mainFrame, "Background")
 mainCorner = Instance.new("UICorner")
 mainCorner.CornerRadius = UDim.new(0, 4)
 mainCorner.Parent = mainFrame
+
+
 
 menuAnimateScale = Instance.new("UIScale")
 menuAnimateScale.Scale = 1.0
@@ -1069,9 +1073,9 @@ titleCorner.Parent = titleBar
 titleText = Instance.new("TextLabel")
 titleText.Name = "TitleText"
 titleText.Size = UDim2.new(1, -90, 1, 0)
-titleText.Position = UDim2.new(0, 15, 0, 0)
+titleText.Position = UDim2.new(0, 25, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "BurLix HUB v2.2.8"
+titleText.Text = "BurLix HUB v2.3.1"
 titleText.TextColor3 = Color3.fromRGB(240, 240, 245)
 titleText.TextSize = 18
 titleText.TextXAlignment = Enum.TextXAlignment.Left
@@ -1164,7 +1168,25 @@ closeCorner.Parent = closeButton
 
 -- Settings popup was removed in favor of a dedicated hidden Settings Tab
 
--- Close Button Hover/Click Styles
+-- Close Button Click/Hover Logic with Confirmation
+local confirmUnload = false
+local unloadSession = 0
+
+local function resetCloseButton()
+    confirmUnload = false
+    TweenService:Create(closeButton, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 24, 0, 24),
+        Position = UDim2.new(1, -34, 0.5, -12)
+    }):Play()
+    if settingsButton then
+        TweenService:Create(settingsButton, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Position = UDim2.new(1, -70, 0.5, -12)
+        }):Play()
+    end
+    closeButton.Text = "X"
+    closeButton.TextSize = 12
+end
+
 closeButton.MouseEnter:Connect(function()
     closeButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
     closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1173,6 +1195,9 @@ closeButton.MouseLeave:Connect(function()
     local colors = themes[currentTheme]
     closeButton.BackgroundColor3 = colors and colors.Header or Color3.fromRGB(50, 50, 55)
     closeButton.TextColor3 = colors and colors.Text or Color3.fromRGB(240, 240, 245)
+    if confirmUnload then
+        resetCloseButton()
+    end
 end)
 
 -- Navigation Panel (Sidebar)
@@ -2436,7 +2461,7 @@ local function createThemeCell(idx, name)
     updateBtnStyle()
 end
 
-local themeNames = {"Dark", "Purple", "Aqua", "Sakura", "Cyberpunk", "Forest", "Nordic", "Sunset", "Midnight", "Emerald", "Nebula", "Monochrome", "Light", "DeepDark", "Mimi"}
+local themeNames = {"Dark", "Purple", "Aqua", "Sakura", "Cyberpunk", "Nordic", "Sunset", "Midnight", "Emerald", "Nebula", "Monochrome", "Light", "DeepDark", "Mimi"}
 for idx, name in ipairs(themeNames) do
     createThemeCell(idx, name)
 end
@@ -3034,7 +3059,7 @@ creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v2.2.8\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v2.3.1\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -3065,7 +3090,7 @@ changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v2.2.8:\n- Added light theme mascot (WhiteFurry.png) automatically downloaded and cached from GitHub.\n- Configured mascot to render dynamically on both Light and DeepDark themes.\n\nChangelog v2.2.7:\n- Optimized contrast on Monochrome and Light themes (active font text, slider knobs, preset outlines, theme cells).\n\nChangelog v2.2.6:\n- Fixed Luau register limit compilation errors by scoping variables.\n- Implemented GPU-caching preload for decals to eliminate white square lag.\n- Improved loading screen with real asset preload.\n\nChangelog v2.2.2:\n- Added sitting mascot (decal ID 3116499937 using rbxthumb format) sitting on the top-left corner of the window, exclusive to the DeepDark theme.\n- Mascot follows window drag/tween dynamically and fades in/out matching GroupTransparency.\n\nChangelog v2.2.1:\n- Fixed UIStroke outlines (profile, bind, keybind, hex textboxes) to dynamically adapt their colors with themes, resolving the harsh dark/bold outlines on the Light theme.\n\nChangelog v2.2.0:\n- Added new themes: \"Light\" (clean light design) and \"DeepDark\" (extra dark high contrast design with hot red accents).\n- Visually highlighted the new themes in the selector grid using golden/orange outlines and custom floating \"NEW\" badges.\n- Expanded the theme container height to 135px to prevent grid cell clipping.\n\nChangelog v2.1.3:\n- Increased corner rounding of compact slider field backgrounds to 6px for a smoother look.\n\nChangelog v2.1.2:\n- Adjusted slider track background transparency to 0.38 (slightly more visible as requested).\n- Implemented dynamic loading screen stages (randomizes stages, speeds, pauses, and introduces occasional artificial loading lags/stalls for maximum realism).\n\nChangelog v2.1.1:\n- Adjusted slider track background transparency to 0.55 to make the groove container less prominent and blend softly with the settings panel.\n\nChangelog v2.1.0:\n- Added a distinct rounded background container specifically behind the slider track area (from start to end), serving as an interactive groove/channel.\n- Bound slider click/drag detection to the entire track background for better responsiveness.\n\nChangelog v2.0.9:\n- Added a distinct background card (bubble) and proper padding/margins for each compact slider to visually isolate them within the settings panel.\n\nChangelog v2.0.8:\n- Fixed compact sliders layout (widened labels to prevent text overlap, added right margin to prevent sliders from touching the edge).\n\nChangelog v2.0.7:\n- Excluded LocalPlayer from visual effects (Chams, Borders, Names, Boxes).\n\nChangelog v2.0.6:\n- Aligned loading screen style with the main menu theme (glass transparency, header borders, no gradient)."
+changelogLabel.Text = "Changelog v2.3.1:\n- Prevented the 'Unload script?' button from overlapping the settings button by sliding the settings button to the left.\n- Fine-tuned Mimi mascot title text offset from 120 to 140 for a more balanced layout.\n- Processed and mirrored the newly updated Mimi.png mascot image on GitHub.\n\nChangelog v2.3.0:\n- Completely removed experimental Glass theme to clean up visual clutter.\n- Added confirmation dialogue (\"Unload script?\") for the close button to prevent accidental unloads.\n- Refined Mimi mascot title offset to bring the script name closer to her silhouette.\n\nChangelog v2.2.8:\n- Added light theme mascot (WhiteFurry.png) automatically downloaded and cached from GitHub.\n- Configured mascot to render dynamically on both Light and DeepDark themes.\n\nChangelog v2.2.7:\n- Optimized contrast on Monochrome and Light themes (active font text, slider knobs, preset outlines, theme cells).\n\nChangelog v2.2.6:\n- Fixed Luau register limit compilation errors by scoping variables.\n- Implemented GPU-caching preload for decals to eliminate white square lag.\n- Improved loading screen with real asset preload.\n\nChangelog v2.2.2:\n- Added sitting mascot (decal ID 3116499937 using rbxthumb format) sitting on the top-left corner of the window, exclusive to the DeepDark theme.\n- Mascot follows window drag/tween dynamically and fades in/out matching GroupTransparency.\n\nChangelog v2.2.1:\n- Fixed UIStroke outlines (profile, bind, keybind, hex textboxes) to dynamically adapt their colors with themes, resolving the harsh dark/bold outlines on the Light theme.\n\nChangelog v2.2.0:\n- Added new themes: \"Light\" (clean light design) and \"DeepDark\" (extra dark high contrast design with hot red accents).\n- Visually highlighted the new themes in the selector grid using golden/orange outlines and custom floating \"NEW\" badges.\n- Expanded the theme container height to 135px to prevent grid cell clipping.\n\nChangelog v2.1.3:\n- Increased corner rounding of compact slider field backgrounds to 6px for a smoother look.\n\nChangelog v2.1.2:\n- Adjusted slider track background transparency to 0.38 (slightly more visible as requested).\n- Implemented dynamic loading screen stages (randomizes stages, speeds, pauses, and introduces occasional artificial loading lags/stalls for maximum realism).\n\nChangelog v2.1.1:\n- Adjusted slider track background transparency to 0.55 to make the groove container less prominent and blend softly with the settings panel.\n\nChangelog v2.1.0:\n- Added a distinct rounded background container specifically behind the slider track area (from start to end), serving as an interactive groove/channel.\n- Bound slider click/drag detection to the entire track background for better responsiveness.\n\nChangelog v2.0.9:\n- Added a distinct background card (bubble) and proper padding/margins for each compact slider to visually isolate them within the settings panel.\n\nChangelog v2.0.8:\n- Fixed compact sliders layout (widened labels to prevent text overlap, added right margin to prevent sliders from touching the edge).\n\nChangelog v2.0.7:\n- Excluded LocalPlayer from visual effects (Chams, Borders, Names, Boxes).\n\nChangelog v2.0.6:\n- Aligned loading screen style with the main menu theme (glass transparency, header borders, no gradient)."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -3275,6 +3300,8 @@ local function unload()
         pcall(function() clickTPVisual:Destroy() end)
     end
     
+
+    
     pcall(function()
         if screenGui and screenGui.Parent then
             screenGui:Destroy()
@@ -3282,7 +3309,36 @@ local function unload()
     end)
 end
 
-table.insert(connections, closeButton.MouseButton1Click:Connect(unload))
+local function handleCloseClick()
+    if not confirmUnload then
+        confirmUnload = true
+        closeButton.Text = "Unload script?"
+        closeButton.TextSize = 10
+        TweenService:Create(closeButton, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 95, 0, 24),
+            Position = UDim2.new(1, -105, 0.5, -12)
+        }):Play()
+        if settingsButton then
+            TweenService:Create(settingsButton, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Position = UDim2.new(1, -141, 0.5, -12)
+            }):Play()
+        end
+        
+        -- Auto reset after 3 seconds if not clicked again
+        unloadSession = unloadSession + 1
+        local currentSession = unloadSession
+        task.spawn(function()
+            task.wait(3)
+            if unloadSession == currentSession and confirmUnload then
+                resetCloseButton()
+            end
+        end)
+    else
+        unload()
+    end
+end
+
+table.insert(connections, closeButton.MouseButton1Click:Connect(handleCloseClick))
 table.insert(connections, settingsButton.MouseButton1Click:Connect(function()
     local isSettings = activeTabName == "Settings"
     local icon = settingsButton:FindFirstChild("Icon")

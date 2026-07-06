@@ -767,7 +767,7 @@ local function applyTheme(themeName)
     if titleText then
         local tweenInfoFast = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
         -- Shift titleText to prevent overlap with mascot: X=95 for Mimi (width 81, visual adjustment), X=150 for DeepDark (width 140), X=110 for Light (width 85), X=15 for others
-        local targetX = (themeName == "Mimi" and 95) or (themeName == "DeepDark" and 150) or (themeName == "Light" and 110) or 15
+        local targetX = (themeName == "Mimi" and 100) or (themeName == "DeepDark" and 155) or (themeName == "Light" and 115) or 20
         pcall(function()
             if titleLogo then
                 TweenService:Create(titleLogo, tweenInfoFast, {
@@ -775,7 +775,7 @@ local function applyTheme(themeName)
                 }):Play()
             end
             TweenService:Create(titleText, tweenInfoFast, {
-                Position = UDim2.new(0, targetX + 34, 0, 0)
+                Position = UDim2.new(0, targetX + 38, 0, 0)
             }):Play()
         end)
     end
@@ -981,7 +981,7 @@ end
 islandFrame = Instance.new("Frame")
 islandFrame.Name = "IslandFrame"
 islandFrame.AnchorPoint = Vector2.new(0.5, 0)
-islandFrame.Size = UDim2.new(0, 270, 0, 35)
+islandFrame.Size = UDim2.new(0, 290, 0, 35)
 islandFrame.Position = UDim2.new(0.5, 0, 0, 15)
 islandFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 islandFrame.BorderSizePixel = 0
@@ -1032,7 +1032,15 @@ local function createIslandLabel(text, sizeX, layoutOrder, isAccent)
     return label
 end
 
-islandTitle = createIslandLabel("BurLix HUB", 65, 1, true)
+islandLogo = Instance.new("ImageLabel")
+islandLogo.Name = "IslandLogo"
+islandLogo.Size = UDim2.new(0, 18, 0, 18)
+islandLogo.BackgroundTransparency = 1
+islandLogo.Image = getBurlixLogoAsset()
+islandLogo.LayoutOrder = 1
+islandLogo.Parent = statsContainer
+
+islandTitle = createIslandLabel("BurLix HUB", 65, 2, true)
 
 -- Vertical Separator on Island
 islandSeparator = Instance.new("Frame")
@@ -1040,12 +1048,12 @@ islandSeparator.Name = "Separator"
 islandSeparator.Size = UDim2.new(0, 1, 0, 18)
 islandSeparator.BackgroundColor3 = Color3.fromRGB(80, 80, 85)
 islandSeparator.BorderSizePixel = 0
-islandSeparator.LayoutOrder = 2
+islandSeparator.LayoutOrder = 3
 islandSeparator.Parent = statsContainer
 registerThemeElement(islandSeparator, "Header")
 
-islandFPS = createIslandLabel("FPS: --", 50, 3)
-islandPing = createIslandLabel("Ping: --", 60, 4)
+islandFPS = createIslandLabel("FPS: --", 50, 4)
+islandPing = createIslandLabel("Ping: --", 60, 5)
 
 -- Set initial visibility from state
 islandFrame.Visible = false
@@ -1089,8 +1097,8 @@ titleCorner.Parent = titleBar
 -- Title Logo (glowing custom script logo)
 titleLogo = Instance.new("ImageLabel")
 titleLogo.Name = "TitleLogo"
-titleLogo.Size = UDim2.new(0, 28, 0, 28)
-titleLogo.Position = UDim2.new(0, 15, 0.5, -14)
+titleLogo.Size = UDim2.new(0, 32, 0, 32)
+titleLogo.Position = UDim2.new(0, 20, 0.5, -14)
 titleLogo.BackgroundTransparency = 1
 titleLogo.Image = getBurlixLogoAsset()
 titleLogo.Parent = titleBar
@@ -1099,9 +1107,9 @@ titleLogo.Parent = titleBar
 titleText = Instance.new("TextLabel")
 titleText.Name = "TitleText"
 titleText.Size = UDim2.new(1, -120, 1, 0)
-titleText.Position = UDim2.new(0, 49, 0, 0)
+titleText.Position = UDim2.new(0, 58, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "BurLix HUB v2.3.8"
+titleText.Text = "BurLix HUB v2.3.9"
 titleText.TextColor3 = Color3.fromRGB(240, 240, 245)
 titleText.TextSize = 18
 titleText.TextXAlignment = Enum.TextXAlignment.Left
@@ -3258,7 +3266,7 @@ creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v2.3.8\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v2.3.9\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -3283,13 +3291,13 @@ registerThemeElement(thankYouLabel, "Text")
 registerFontElement(thankYouLabel, "Regular")
 
 -- Changelog Card (Taller to comfortably fit wrapped version history text)
-changelogCard = createRow(authorsTab, "ChangelogCard", 230, 2)
+changelogCard = createRow(authorsTab, "ChangelogCard", 250, 2)
 
 changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v2.3.8:\n- Added a brand new 'Others' tab containing server utilities (Rejoin, Server Hop, Copy Job ID) and character cheats (Infinite Jump).\n- Made the main menu title bar logo 40% larger (28x28 pixels) and adjusted title offsets for a premium high-res look.\n\nChangelog v2.3.7:\n- Integrated the user's customized minimalist fox head logo (transparent background) into the title bar and loading screen.\n\nChangelog v2.3.6:\n- Replaced the complex logo with a minimalist flat fox head vector icon, optimized for small resolutions.\n- Made the fox head background transparent to blend seamlessly with title bars.\n\nChangelog v2.3.5:\n- Slightly increased the corner rounding of the stats island from 4 to 8 for a smoother premium look.\n- Positioned the script title closer to the Mimi mascot (offset 95) for better integration.\n- Generated and integrated a custom cybernetic gaming logo for BurLix HUB, displayed on the loading screen and title bar.\n\nChangelog v2.3.4:\n- Grouped the Light theme (white furry mascot) on Row 3 alongside the other Furry mascot themes (DeepDark, Mimi) to prevent layout split.\n- Updated the Mimi theme color scheme to main #6A4D44 (dark brown) and secondary #EECDBC (light peach) as requested.\n\nChangelog v2.3.3:\n- Increased Mimi mascot size to 81x165 (main menu) and 26x54 (stats island).\n- Positioned Mimi mascot lower (offsetY = 65 on main menu, 22 on stats island) as requested.\n- Shifted titleText offset to 110 to fit the new larger mascot width.\n\nChangelog v2.3.2:\n- Fixed aspect ratio stretching and compression for the newly updated Mimi mascot by setting sizes to 69x140 (main menu) and 23x46 (stats island).\n- Repositioned the menu title text closer to the updated Mimi mascot.\n\nChangelog v2.3.1:\n- Prevented the 'Unload script?' button from overlapping the settings button by sliding the settings button to the left.\n- Fine-tuned Mimi mascot title text offset from 120 to 140 for a more balanced layout.\n- Processed and mirrored the newly updated Mimi.png mascot image on GitHub.\n\nChangelog v2.3.0:\n- Completely removed experimental Glass theme to clean up visual clutter.\n- Added confirmation dialogue (\"Unload script?\") for the close button to prevent accidental unloads.\n- Refined Mimi mascot title offset to bring the script name closer to her silhouette.\n\nChangelog v2.2.8:\n- Added light theme mascot (WhiteFurry.png) automatically downloaded and cached from GitHub.\n- Configured mascot to render dynamically on both Light and DeepDark themes.\n\nChangelog v2.2.7:\n- Optimized contrast on Monochrome and Light themes (active font text, slider knobs, preset outlines, theme cells).\n\nChangelog v2.2.6:\n- Fixed Luau register limit compilation errors by scoping variables.\n- Implemented GPU-caching preload for decals to eliminate white square lag.\n- Improved loading screen with real asset preload.\n\nChangelog v2.2.2:\n- Added sitting mascot (decal ID 3116499937 using rbxthumb format) sitting on the top-left corner of the window, exclusive to the DeepDark theme.\n- Mascot follows window drag/tween dynamically and fades in/out matching GroupTransparency.\n\nChangelog v2.2.1:\n- Fixed UIStroke outlines (profile, bind, keybind, hex textboxes) to dynamically adapt their colors with themes, resolving the harsh dark/bold outlines on the Light theme.\n\nChangelog v2.2.0:\n- Added new themes: \"Light\" (clean light design) and \"DeepDark\" (extra dark high contrast design with hot red accents).\n- Visually highlighted the new themes in the selector grid using golden/orange outlines and custom floating \"NEW\" badges.\n- Expanded the theme container height to 135px to prevent grid cell clipping.\n\nChangelog v2.1.3:\n- Increased corner rounding of compact slider field backgrounds to 6px for a smoother look.\n\nChangelog v2.1.2:\n- Adjusted slider track background transparency to 0.38 (slightly more visible as requested).\n- Implemented dynamic loading screen stages (randomizes stages, speeds, pauses, and introduces occasional artificial loading lags/stalls for maximum realism).\n\nChangelog v2.1.1:\n- Adjusted slider track background transparency to 0.55 to make the groove container less prominent and blend softly with the settings panel.\n\nChangelog v2.1.0:\n- Added a distinct rounded background container specifically behind the slider track area (from start to end), serving as an interactive groove/channel.\n- Bound slider click/drag detection to the entire track background for better responsiveness.\n\nChangelog v2.0.9:\n- Added a distinct background card (bubble) and proper padding/margins for each compact slider to visually isolate them within the settings panel.\n- Fixed compact sliders layout (widened labels to prevent text overlap, added right margin to prevent sliders from touching the edge).\n- Excluded LocalPlayer from visual effects (Chams, Borders, Names, Boxes).\n- Aligned loading screen style with the main menu theme (glass transparency, header borders, no gradient)."
+changelogLabel.Text = "Changelog v2.3.9:\n- Made loading screen logo larger (110x110 px) and adjusted spacing.\n- Enlarged title bar logo to 32x32 px and repositioned it (slightly lower/more right) for perfect alignment.\n- Added the custom script icon onto the top stats island next to the 'BurLix HUB' label.\n\nChangelog v2.3.8:\n- Added a brand new 'Others' tab containing server utilities (Rejoin, Server Hop, Copy Job ID) and character cheats (Infinite Jump).\n- Made the main menu title bar logo 40% larger (28x28 pixels) and adjusted title offsets for a premium high-res look.\n\nChangelog v2.3.7:\n- Integrated the user's customized minimalist fox head logo (transparent background) into the title bar and loading screen.\n\nChangelog v2.3.6:\n- Replaced the complex logo with a minimalist flat fox head vector icon, optimized for small resolutions.\n- Made the fox head background transparent to blend seamlessly with title bars.\n\nChangelog v2.3.5:\n- Slightly increased the corner rounding of the stats island from 4 to 8 for a smoother premium look.\n- Positioned the script title closer to the Mimi mascot (offset 95) for better integration.\n- Generated and integrated a custom cybernetic gaming logo for BurLix HUB, displayed on the loading screen and title bar.\n\nChangelog v2.3.4:\n- Grouped the Light theme (white furry mascot) on Row 3 alongside the other Furry mascot themes (DeepDark, Mimi) to prevent layout split.\n- Updated the Mimi theme color scheme to main #6A4D44 (dark brown) and secondary #EECDBC (light peach) as requested.\n\nChangelog v2.3.3:\n- Increased Mimi mascot size to 81x165 (main menu) and 26x54 (stats island).\n- Positioned Mimi mascot lower (offsetY = 65 on main menu, 22 on stats island) as requested.\n- Shifted titleText offset to 110 to fit the new larger mascot width.\n\nChangelog v2.3.2:\n- Fixed aspect ratio stretching and compression for the newly updated Mimi mascot by setting sizes to 69x140 (main menu) and 23x46 (stats island).\n- Repositioned the menu title text closer to the updated Mimi mascot.\n\nChangelog v2.3.1:\n- Prevented the 'Unload script?' button from overlapping the settings button by sliding the settings button to the left.\n- Fine-tuned Mimi mascot title text offset from 120 to 140 for a more balanced layout.\n- Processed and mirrored the newly updated Mimi.png mascot image on GitHub.\n\nChangelog v2.3.0:\n- Completely removed experimental Glass theme to clean up visual clutter.\n- Added confirmation dialogue (\"Unload script?\") for the close button to prevent accidental unloads.\n- Refined Mimi mascot title offset to bring the script name closer to her silhouette.\n\nChangelog v2.2.8:\n- Added light theme mascot (WhiteFurry.png) automatically downloaded and cached from GitHub.\n- Configured mascot to render dynamically on both Light and DeepDark themes.\n\nChangelog v2.2.7:\n- Optimized contrast on Monochrome and Light themes (active font text, slider knobs, preset outlines, theme cells).\n\nChangelog v2.2.6:\n- Fixed Luau register limit compilation errors by scoping variables.\n- Implemented GPU-caching preload for decals to eliminate white square lag.\n- Improved loading screen with real asset preload.\n\nChangelog v2.2.2:\n- Added sitting mascot (decal ID 3116499937 using rbxthumb format) sitting on the top-left corner of the window, exclusive to the DeepDark theme.\n- Mascot follows window drag/tween dynamically and fades in/out matching GroupTransparency.\n\nChangelog v2.2.1:\n- Fixed UIStroke outlines (profile, bind, keybind, hex textboxes) to dynamically adapt their colors with themes, resolving the harsh dark/bold outlines on the Light theme.\n\nChangelog v2.2.0:\n- Added new themes: \"Light\" (clean light design) and \"DeepDark\" (extra dark high contrast design with hot red accents).\n- Visually highlighted the new themes in the selector grid using golden/orange outlines and custom floating \"NEW\" badges.\n- Expanded the theme container height to 135px to prevent grid cell clipping.\n\nChangelog v2.1.3:\n- Increased corner rounding of compact slider field backgrounds to 6px for a smoother look.\n\nChangelog v2.1.2:\n- Adjusted slider track background transparency to 0.38 (slightly more visible as requested).\n- Implemented dynamic loading screen stages (randomizes stages, speeds, pauses, and introduces occasional artificial loading lags/stalls for maximum realism).\n\nChangelog v2.1.1:\n- Adjusted slider track background transparency to 0.55 to make the groove container less prominent and blend softly with the settings panel.\n\nChangelog v2.1.0:\n- Added a distinct rounded background container specifically behind the slider track area (from start to end), serving as an interactive groove/channel.\n- Bound slider click/drag detection to the entire track background for better responsiveness.\n\nChangelog v2.0.9:\n- Added a distinct background card (bubble) and proper padding/margins for each compact slider to visually isolate them within the settings panel.\n- Fixed compact sliders layout (widened labels to prevent text overlap, added right margin to prevent sliders from touching the edge).\n- Excluded LocalPlayer from visual effects (Chams, Borders, Names, Boxes).\n- Aligned loading screen style with the main menu theme (glass transparency, header borders, no gradient)."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -3712,21 +3720,21 @@ local function startLoadingScreen()
     -- Logo Image
     local logo = Instance.new("ImageLabel")
     logo.Name = "Logo"
-    logo.Size = UDim2.new(0, 90, 0, 90)
-    logo.Position = UDim2.new(0.5, -45, 0, 30)
+    logo.Size = UDim2.new(0, 110, 0, 110)
+    logo.Position = UDim2.new(0.5, -55, 0, 20)
     logo.BackgroundTransparency = 1
     logo.Image = getBurlixLogoAsset()
     logo.Parent = loadingFrame
     
     local logoCorner = Instance.new("UICorner")
-    logoCorner.CornerRadius = UDim.new(0, 8)
+    logoCorner.CornerRadius = UDim.new(0, 12)
     logoCorner.Parent = logo
     
     -- Title Label
     local title = Instance.new("TextLabel")
     title.Name = "Title"
     title.Size = UDim2.new(1, 0, 0, 30)
-    title.Position = UDim2.new(0, 0, 0, 135)
+    title.Position = UDim2.new(0, 0, 0, 145)
     title.BackgroundTransparency = 1
     title.Text = "BurLix HUB"
     title.TextColor3 = colors.Text
@@ -3738,7 +3746,7 @@ local function startLoadingScreen()
     local pleaseWait = Instance.new("TextLabel")
     pleaseWait.Name = "PleaseWait"
     pleaseWait.Size = UDim2.new(1, 0, 0, 15)
-    pleaseWait.Position = UDim2.new(0, 0, 0, 162)
+    pleaseWait.Position = UDim2.new(0, 0, 0, 172)
     pleaseWait.BackgroundTransparency = 1
     pleaseWait.Text = "Please wait"
     pleaseWait.TextColor3 = colors.Text
@@ -3756,7 +3764,7 @@ local function startLoadingScreen()
     local status = Instance.new("TextLabel")
     status.Name = "Status"
     status.Size = UDim2.new(1, -40, 0, 20)
-    status.Position = UDim2.new(0, 20, 0, 185)
+    status.Position = UDim2.new(0, 20, 0, 195)
     status.BackgroundTransparency = 1
     status.Text = "Loading Assets..."
     status.TextColor3 = Color3.fromRGB(180, 180, 185)
@@ -3768,7 +3776,7 @@ local function startLoadingScreen()
     local barBg = Instance.new("Frame")
     barBg.Name = "BarBackground"
     barBg.Size = UDim2.new(1, -40, 0, 6)
-    barBg.Position = UDim2.new(0, 20, 0, 212)
+    barBg.Position = UDim2.new(0, 20, 0, 220)
     barBg.BackgroundColor3 = colors.Sidebar
     barBg.BorderSizePixel = 0
     barBg.Parent = loadingFrame
@@ -3793,7 +3801,7 @@ local function startLoadingScreen()
     local percent = Instance.new("TextLabel")
     percent.Name = "Percent"
     percent.Size = UDim2.new(1, 0, 0, 20)
-    percent.Position = UDim2.new(0, 0, 0, 226)
+    percent.Position = UDim2.new(0, 0, 0, 234)
     percent.BackgroundTransparency = 1
     percent.Text = "0%"
     percent.TextColor3 = colors.Accent

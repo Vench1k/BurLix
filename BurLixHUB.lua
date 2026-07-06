@@ -310,6 +310,7 @@ local tabs = {}
 local tabIcons = {
     Player  = "rbxassetid://10747373176",  -- User/Person icon
     World   = "rbxassetid://10723398002",   -- Planet icon
+    Others  = "rbxassetid://10723377953",   -- Package/Box icon
     Visuals = "rbxassetid://10723346959"   -- Eye icon
 }
 
@@ -770,11 +771,11 @@ local function applyTheme(themeName)
         pcall(function()
             if titleLogo then
                 TweenService:Create(titleLogo, tweenInfoFast, {
-                    Position = UDim2.new(0, targetX, 0.5, -10)
+                    Position = UDim2.new(0, targetX, 0.5, -14)
                 }):Play()
             end
             TweenService:Create(titleText, tweenInfoFast, {
-                Position = UDim2.new(0, targetX + 26, 0, 0)
+                Position = UDim2.new(0, targetX + 34, 0, 0)
             }):Play()
         end)
     end
@@ -1088,8 +1089,8 @@ titleCorner.Parent = titleBar
 -- Title Logo (glowing custom script logo)
 titleLogo = Instance.new("ImageLabel")
 titleLogo.Name = "TitleLogo"
-titleLogo.Size = UDim2.new(0, 20, 0, 20)
-titleLogo.Position = UDim2.new(0, 15, 0.5, -10)
+titleLogo.Size = UDim2.new(0, 28, 0, 28)
+titleLogo.Position = UDim2.new(0, 15, 0.5, -14)
 titleLogo.BackgroundTransparency = 1
 titleLogo.Image = getBurlixLogoAsset()
 titleLogo.Parent = titleBar
@@ -1098,9 +1099,9 @@ titleLogo.Parent = titleBar
 titleText = Instance.new("TextLabel")
 titleText.Name = "TitleText"
 titleText.Size = UDim2.new(1, -120, 1, 0)
-titleText.Position = UDim2.new(0, 41, 0, 0)
+titleText.Position = UDim2.new(0, 49, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "BurLix HUB v2.3.7"
+titleText.Text = "BurLix HUB v2.3.8"
 titleText.TextColor3 = Color3.fromRGB(240, 240, 245)
 titleText.TextSize = 18
 titleText.TextXAlignment = Enum.TextXAlignment.Left
@@ -1868,6 +1869,98 @@ local function createToggle(tabFrame, name, defaultVal, layoutOrder, onChange, o
     return row
 end
 
+-- Helper Function to Create Buttons
+local function createButton(tabFrame, name, layoutOrder, onClick)
+    local row = Instance.new("TextButton")
+    row.Name = name .. "Row"
+    row.Size = UDim2.new(1, 0, 0, 45)
+    row.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+    row.BorderSizePixel = 0
+    row.LayoutOrder = layoutOrder
+    row.Text = ""
+    row.AutoButtonColor = false
+    row.Parent = tabFrame
+    
+    local rowCorner = Instance.new("UICorner")
+    rowCorner.CornerRadius = UDim.new(0, 3)
+    rowCorner.Parent = row
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -125, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.TextColor3 = Color3.fromRGB(220, 220, 225)
+    label.TextSize = 14
+    label.Font = Enum.Font.SourceSansBold
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = row
+    registerFontElement(label, "Bold")
+    registerThemeElement(label, "Text")
+    
+    local actionLabel = Instance.new("TextLabel")
+    actionLabel.Size = UDim2.new(0, 80, 0, 24)
+    actionLabel.Position = UDim2.new(1, -90, 0.5, -12)
+    actionLabel.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    actionLabel.BorderSizePixel = 0
+    actionLabel.Text = "Execute"
+    actionLabel.TextColor3 = Color3.fromRGB(240, 240, 245)
+    actionLabel.TextSize = 12
+    actionLabel.Font = Enum.Font.SourceSansBold
+    actionLabel.Parent = row
+    registerThemeElement(actionLabel, "Background")
+    registerThemeElement(actionLabel, "Text")
+    registerFontElement(actionLabel, "Bold")
+    
+    local actionCorner = Instance.new("UICorner")
+    actionCorner.CornerRadius = UDim.new(0, 3)
+    actionCorner.Parent = actionLabel
+    
+    local actionStroke = Instance.new("UIStroke")
+    actionStroke.Thickness = 1
+    actionStroke.Color = Color3.fromRGB(55, 55, 60)
+    actionStroke.Parent = actionLabel
+    registerThemeElement(actionStroke, "Header")
+    
+    registerThemeElement(row, "Card")
+    
+    table.insert(connections, row.MouseButton1Click:Connect(function()
+        local colors = themes[currentTheme]
+        if colors then
+            TweenService:Create(actionLabel, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundColor3 = colors.Accent
+            }):Play()
+            task.delay(0.08, function()
+                TweenService:Create(actionLabel, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                    BackgroundColor3 = colors.Sidebar
+                }):Play()
+            end)
+        end
+        pcall(onClick)
+    end))
+    
+    table.insert(connections, row.MouseEnter:Connect(function()
+        local colors = themes[currentTheme]
+        if colors then
+            local hoverColor = Color3.fromRGB(
+                math.clamp(colors.Card.R * 255 - 7, 0, 255),
+                math.clamp(colors.Card.G * 255 - 7, 0, 255),
+                math.clamp(colors.Card.B * 255 - 7, 0, 255)
+            )
+            TweenService:Create(row, TweenInfo.new(0.2), {BackgroundColor3 = hoverColor}):Play()
+        end
+    end))
+    
+    table.insert(connections, row.MouseLeave:Connect(function()
+        local colors = themes[currentTheme]
+        if colors then
+            TweenService:Create(row, TweenInfo.new(0.2), {BackgroundColor3 = colors.Card}):Play()
+        end
+    end))
+    
+    return row
+end
+
 -- Helper function to toggle settings panel with smooth Size animation
 local function toggleSettingsPanel(panel, targetHeight)
     local isOpening = not panel.Visible or panel.Size.Y.Offset == 0
@@ -2216,9 +2309,10 @@ end
 -- Create Tabs (Decreased Authors tab canvas height since Reset buttons are removed)
 playerTab = createTab("Player", 1, 200)
 worldTab = createTab("World", 2, 200)
-authorsTab = createTab("Authors", 3, 520)
-visualsTab = createTab("Visuals", 4, 850)
-settingsTab = createTab("Settings", 5, 650)
+othersTab = createTab("Others", 3, 220)
+authorsTab = createTab("Authors", 4, 520)
+visualsTab = createTab("Visuals", 5, 850)
+settingsTab = createTab("Settings", 6, 650)
 
 -- Settings Tab Content
 settingsTitle = Instance.new("TextLabel")
@@ -3083,6 +3177,78 @@ do
 end
 
 
+-- ==================== OTHERS TAB CONTENTS ====================
+
+do
+    local othersTitle = Instance.new("TextLabel")
+    othersTitle.Name = "OthersTitle"
+    othersTitle.Size = UDim2.new(1, -20, 0, 30)
+    othersTitle.Position = UDim2.new(0, 10, 0, 10)
+    othersTitle.BackgroundTransparency = 1
+    othersTitle.Text = "Miscellaneous Utilities"
+    othersTitle.TextColor3 = Color3.fromRGB(240, 240, 245)
+    othersTitle.TextSize = 16
+    othersTitle.Font = Enum.Font.SourceSansBold
+    othersTitle.TextXAlignment = Enum.TextXAlignment.Left
+    othersTitle.LayoutOrder = 0
+    othersTitle.Parent = othersTab
+    registerThemeElement(othersTitle, "Text")
+    registerFontElement(othersTitle, "Bold")
+    
+    local InfiniteJumpEnabled = false
+    local infJumpConnection = nil
+    
+    local infJumpRow = createToggle(othersTab, "Infinite Jump", false, 1, function(state)
+        InfiniteJumpEnabled = state
+        if state then
+            if not infJumpConnection then
+                infJumpConnection = UserInputService.JumpRequest:Connect(function()
+                    if InfiniteJumpEnabled and player.Character then
+                        local hum = player.Character:FindFirstChildOfClass("Humanoid")
+                        if hum then
+                            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                        end
+                    end
+                end)
+                table.insert(connections, infJumpConnection)
+            end
+        end
+    end)
+    
+    local rejoinRow = createButton(othersTab, "Rejoin Server", 2, function()
+        local ts = game:GetService("TeleportService")
+        pcall(function()
+            ts:TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
+        end)
+    end)
+    
+    local serverHopRow = createButton(othersTab, "Server Hop", 3, function()
+        local ts = game:GetService("TeleportService")
+        local http = game:GetService("HttpService")
+        pcall(function()
+            local raw = game:HttpGet("https://games.roblox.com/v1/games/" .. tostring(game.PlaceId) .. "/servers/Public?sortOrder=Asc&limit=100")
+            local decoded = http:JSONDecode(raw)
+            if decoded and decoded.data then
+                for _, server in ipairs(decoded.data) do
+                    if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                        ts:TeleportToPlaceInstance(game.PlaceId, server.id, player)
+                        break
+                    end
+                end
+            end
+        end)
+    end)
+    
+    local copyJobRow = createButton(othersTab, "Copy Server Job ID", 4, function()
+        if setclipboard then
+            pcall(setclipboard, tostring(game.JobId))
+        else
+            pcall(print, "Server Job ID: " .. tostring(game.JobId))
+        end
+    end)
+end
+
+
 -- ==================== AUTHORS TAB CONTENTS ====================
 
 -- Creators Info (Separated thank you footer to prevent clipping)
@@ -3092,7 +3258,7 @@ creatorsLabel = Instance.new("TextLabel")
 creatorsLabel.Size = UDim2.new(1, -20, 0, 75)
 creatorsLabel.Position = UDim2.new(0, 10, 0, 5)
 creatorsLabel.BackgroundTransparency = 1
-creatorsLabel.Text = "BurLix HUB v2.3.7\n\nCreators:\n- Vench1k\n- Gemini"
+creatorsLabel.Text = "BurLix HUB v2.3.8\n\nCreators:\n- Vench1k\n- Gemini"
 creatorsLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
 creatorsLabel.TextSize = 13
 creatorsLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -3117,13 +3283,13 @@ registerThemeElement(thankYouLabel, "Text")
 registerFontElement(thankYouLabel, "Regular")
 
 -- Changelog Card (Taller to comfortably fit wrapped version history text)
-changelogCard = createRow(authorsTab, "ChangelogCard", 210, 2)
+changelogCard = createRow(authorsTab, "ChangelogCard", 230, 2)
 
 changelogLabel = Instance.new("TextLabel")
 changelogLabel.Size = UDim2.new(1, -20, 1, -10)
 changelogLabel.Position = UDim2.new(0, 10, 0, 5)
 changelogLabel.BackgroundTransparency = 1
-changelogLabel.Text = "Changelog v2.3.7:\n- Integrated the user's customized minimalist fox head logo (transparent background) into the title bar and loading screen.\n\nChangelog v2.3.6:\n- Replaced the complex logo with a minimalist flat fox head vector icon, optimized for small resolutions.\n- Made the fox head background transparent to blend seamlessly with title bars.\n\nChangelog v2.3.5:\n- Slightly increased the corner rounding of the stats island from 4 to 8 for a smoother premium look.\n- Positioned the script title closer to the Mimi mascot (offset 95) for better integration.\n- Generated and integrated a custom cybernetic gaming logo for BurLix HUB, displayed on the loading screen and title bar.\n\nChangelog v2.3.4:\n- Grouped the Light theme (white furry mascot) on Row 3 alongside the other Furry mascot themes (DeepDark, Mimi) to prevent layout split.\n- Updated the Mimi theme color scheme to main #6A4D44 (dark brown) and secondary #EECDBC (light peach) as requested.\n\nChangelog v2.3.3:\n- Increased Mimi mascot size to 81x165 (main menu) and 26x54 (stats island).\n- Positioned Mimi mascot lower (offsetY = 65 on main menu, 22 on stats island) as requested.\n- Shifted titleText offset to 110 to fit the new larger mascot width.\n\nChangelog v2.3.2:\n- Fixed aspect ratio stretching and compression for the newly updated Mimi mascot by setting sizes to 69x140 (main menu) and 23x46 (stats island).\n- Repositioned the menu title text closer to the updated Mimi mascot.\n\nChangelog v2.3.1:\n- Prevented the 'Unload script?' button from overlapping the settings button by sliding the settings button to the left.\n- Fine-tuned Mimi mascot title text offset from 120 to 140 for a more balanced layout.\n- Processed and mirrored the newly updated Mimi.png mascot image on GitHub.\n\nChangelog v2.3.0:\n- Completely removed experimental Glass theme to clean up visual clutter.\n- Added confirmation dialogue (\"Unload script?\") for the close button to prevent accidental unloads.\n- Refined Mimi mascot title offset to bring the script name closer to her silhouette.\n\nChangelog v2.2.8:\n- Added light theme mascot (WhiteFurry.png) automatically downloaded and cached from GitHub.\n- Configured mascot to render dynamically on both Light and DeepDark themes.\n\nChangelog v2.2.7:\n- Optimized contrast on Monochrome and Light themes (active font text, slider knobs, preset outlines, theme cells).\n\nChangelog v2.2.6:\n- Fixed Luau register limit compilation errors by scoping variables.\n- Implemented GPU-caching preload for decals to eliminate white square lag.\n- Improved loading screen with real asset preload.\n\nChangelog v2.2.2:\n- Added sitting mascot (decal ID 3116499937 using rbxthumb format) sitting on the top-left corner of the window, exclusive to the DeepDark theme.\n- Mascot follows window drag/tween dynamically and fades in/out matching GroupTransparency.\n\nChangelog v2.2.1:\n- Fixed UIStroke outlines (profile, bind, keybind, hex textboxes) to dynamically adapt their colors with themes, resolving the harsh dark/bold outlines on the Light theme.\n\nChangelog v2.2.0:\n- Added new themes: \"Light\" (clean light design) and \"DeepDark\" (extra dark high contrast design with hot red accents).\n- Visually highlighted the new themes in the selector grid using golden/orange outlines and custom floating \"NEW\" badges.\n- Expanded the theme container height to 135px to prevent grid cell clipping.\n\nChangelog v2.1.3:\n- Increased corner rounding of compact slider field backgrounds to 6px for a smoother look.\n\nChangelog v2.1.2:\n- Adjusted slider track background transparency to 0.38 (slightly more visible as requested).\n- Implemented dynamic loading screen stages (randomizes stages, speeds, pauses, and introduces occasional artificial loading lags/stalls for maximum realism).\n\nChangelog v2.1.1:\n- Adjusted slider track background transparency to 0.55 to make the groove container less prominent and blend softly with the settings panel.\n\nChangelog v2.1.0:\n- Added a distinct rounded background container specifically behind the slider track area (from start to end), serving as an interactive groove/channel.\n- Bound slider click/drag detection to the entire track background for better responsiveness.\n\nChangelog v2.0.9:\n- Added a distinct background card (bubble) and proper padding/margins for each compact slider to visually isolate them within the settings panel.\n- Fixed compact sliders layout (widened labels to prevent text overlap, added right margin to prevent sliders from touching the edge).\n- Excluded LocalPlayer from visual effects (Chams, Borders, Names, Boxes).\n- Aligned loading screen style with the main menu theme (glass transparency, header borders, no gradient)."
+changelogLabel.Text = "Changelog v2.3.8:\n- Added a brand new 'Others' tab containing server utilities (Rejoin, Server Hop, Copy Job ID) and character cheats (Infinite Jump).\n- Made the main menu title bar logo 40% larger (28x28 pixels) and adjusted title offsets for a premium high-res look.\n\nChangelog v2.3.7:\n- Integrated the user's customized minimalist fox head logo (transparent background) into the title bar and loading screen.\n\nChangelog v2.3.6:\n- Replaced the complex logo with a minimalist flat fox head vector icon, optimized for small resolutions.\n- Made the fox head background transparent to blend seamlessly with title bars.\n\nChangelog v2.3.5:\n- Slightly increased the corner rounding of the stats island from 4 to 8 for a smoother premium look.\n- Positioned the script title closer to the Mimi mascot (offset 95) for better integration.\n- Generated and integrated a custom cybernetic gaming logo for BurLix HUB, displayed on the loading screen and title bar.\n\nChangelog v2.3.4:\n- Grouped the Light theme (white furry mascot) on Row 3 alongside the other Furry mascot themes (DeepDark, Mimi) to prevent layout split.\n- Updated the Mimi theme color scheme to main #6A4D44 (dark brown) and secondary #EECDBC (light peach) as requested.\n\nChangelog v2.3.3:\n- Increased Mimi mascot size to 81x165 (main menu) and 26x54 (stats island).\n- Positioned Mimi mascot lower (offsetY = 65 on main menu, 22 on stats island) as requested.\n- Shifted titleText offset to 110 to fit the new larger mascot width.\n\nChangelog v2.3.2:\n- Fixed aspect ratio stretching and compression for the newly updated Mimi mascot by setting sizes to 69x140 (main menu) and 23x46 (stats island).\n- Repositioned the menu title text closer to the updated Mimi mascot.\n\nChangelog v2.3.1:\n- Prevented the 'Unload script?' button from overlapping the settings button by sliding the settings button to the left.\n- Fine-tuned Mimi mascot title text offset from 120 to 140 for a more balanced layout.\n- Processed and mirrored the newly updated Mimi.png mascot image on GitHub.\n\nChangelog v2.3.0:\n- Completely removed experimental Glass theme to clean up visual clutter.\n- Added confirmation dialogue (\"Unload script?\") for the close button to prevent accidental unloads.\n- Refined Mimi mascot title offset to bring the script name closer to her silhouette.\n\nChangelog v2.2.8:\n- Added light theme mascot (WhiteFurry.png) automatically downloaded and cached from GitHub.\n- Configured mascot to render dynamically on both Light and DeepDark themes.\n\nChangelog v2.2.7:\n- Optimized contrast on Monochrome and Light themes (active font text, slider knobs, preset outlines, theme cells).\n\nChangelog v2.2.6:\n- Fixed Luau register limit compilation errors by scoping variables.\n- Implemented GPU-caching preload for decals to eliminate white square lag.\n- Improved loading screen with real asset preload.\n\nChangelog v2.2.2:\n- Added sitting mascot (decal ID 3116499937 using rbxthumb format) sitting on the top-left corner of the window, exclusive to the DeepDark theme.\n- Mascot follows window drag/tween dynamically and fades in/out matching GroupTransparency.\n\nChangelog v2.2.1:\n- Fixed UIStroke outlines (profile, bind, keybind, hex textboxes) to dynamically adapt their colors with themes, resolving the harsh dark/bold outlines on the Light theme.\n\nChangelog v2.2.0:\n- Added new themes: \"Light\" (clean light design) and \"DeepDark\" (extra dark high contrast design with hot red accents).\n- Visually highlighted the new themes in the selector grid using golden/orange outlines and custom floating \"NEW\" badges.\n- Expanded the theme container height to 135px to prevent grid cell clipping.\n\nChangelog v2.1.3:\n- Increased corner rounding of compact slider field backgrounds to 6px for a smoother look.\n\nChangelog v2.1.2:\n- Adjusted slider track background transparency to 0.38 (slightly more visible as requested).\n- Implemented dynamic loading screen stages (randomizes stages, speeds, pauses, and introduces occasional artificial loading lags/stalls for maximum realism).\n\nChangelog v2.1.1:\n- Adjusted slider track background transparency to 0.55 to make the groove container less prominent and blend softly with the settings panel.\n\nChangelog v2.1.0:\n- Added a distinct rounded background container specifically behind the slider track area (from start to end), serving as an interactive groove/channel.\n- Bound slider click/drag detection to the entire track background for better responsiveness.\n\nChangelog v2.0.9:\n- Added a distinct background card (bubble) and proper padding/margins for each compact slider to visually isolate them within the settings panel.\n- Fixed compact sliders layout (widened labels to prevent text overlap, added right margin to prevent sliders from touching the edge).\n- Excluded LocalPlayer from visual effects (Chams, Borders, Names, Boxes).\n- Aligned loading screen style with the main menu theme (glass transparency, header borders, no gradient)."
 changelogLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 changelogLabel.TextSize = 12
 changelogLabel.TextXAlignment = Enum.TextXAlignment.Left
